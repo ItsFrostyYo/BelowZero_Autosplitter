@@ -6,6 +6,8 @@ Livesplit.BelowZero/obj/
 Components/*.dll
 Components/*.pdb
 Components/*.xml
+!Components/LiveSplit.BelowZero.dll
+!Components/BelowZero.Updates.xml
 
 _work/
 docs/

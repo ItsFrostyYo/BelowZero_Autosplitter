@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<updates>
+    <update version="1.0.0.0">
+        <files>
+            <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>
+        </files>
+        <changelog>
+            <change>Initial Below Zero Autosplitter Release</change>
+        </changelog>
+    </update>
+</updates>

@@ -16,7 +16,7 @@ namespace LiveSplit.BelowZero {
 
         public string XMLURL => UpdateURL + "Components/BelowZero.Updates.xml";
 
-        public string UpdateURL => "https://raw.githubusercontent.com/Sprinter31/Subnautica_Autosplitter/LiveSplit.BelowZero-voxif/";
+        public string UpdateURL => "https://raw.githubusercontent.com/ItsFrostyYo/BelowZero_Autosplitter/main/";
 
         public Version Version => ExAssembly.GetName().Version;
 
