@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{2C1210E7-0CE3-450E-95CE-27026BCDE375}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>LiveSplit.BelowZero</RootNamespace>
+    <AssemblyName>LiveSplit.BelowZero</AssemblyName>
+    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;LOG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Enums\Biome.cs" />
+    <Compile Include="Enums\Craftable.cs" />
+    <Compile Include="Enums\EncyclopediaEntry.cs" />
+    <Compile Include="Enums\GameMode.cs" />
+    <Compile Include="Enums\GameModeOption.cs" />
+    <Compile Include="Enums\GameModePresetId.cs" />
+    <Compile Include="Enums\InventoryItem.cs" />
+    <Compile Include="Enums\PDAState.cs" />
+    <Compile Include="Enums\PDATab.cs" />
+    <Compile Include="Enums\GameVersion.cs" />
+    <Compile Include="Enums\PlayerMode.cs" />
+    <Compile Include="Enums\Unlockable.cs" />
+    <Compile Include="Localization.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\BiomeSplit\BelowZeroBiomeSplitSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\BiomeSplit\BelowZeroBiomeSplitSettings.Designer.cs">
+      <DependentUpon>BelowZeroBiomeSplitSettings.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\BlueprintSplit\BelowZeroBlueprintSplitSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\BlueprintSplit\BelowZeroBlueprintSplitSettings.Designer.cs">
+      <DependentUpon>BelowZeroBlueprintSplitSettings.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\CraftSplit\BelowZeroCraftSplit.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\CraftSplit\BelowZeroCraftSplit.Designer.cs">
+      <DependentUpon>BelowZeroCraftSplit.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\CraftSplit\BelowZeroCraftSplitSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\CraftSplit\BelowZeroCraftSplitSettings.Designer.cs">
+      <DependentUpon>BelowZeroCraftSplitSettings.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\EncyclopediaSplit\BelowZeroEncyclopediaSplitSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\EncyclopediaSplit\BelowZeroEncyclopediaSplitSettings.Designer.cs">
+      <DependentUpon>BelowZeroEncyclopediaSplitSettings.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\ItemSplit\BelowZeroItemSplitSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\ItemSplit\BelowZeroItemSplitSettings.Designer.cs">
+      <DependentUpon>BelowZeroItemSplitSettings.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\Dialogs\SplitSettingsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Settings\Dialogs\SplitSettingsDialog.Designer.cs">
+      <DependentUpon>SplitSettingsDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\Dialogs\SelectSplitType.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Settings\Dialogs\SelectSplitType.Designer.cs">
+      <DependentUpon>SelectSplitType.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\PrefabSplit\BelowZeroPrefabSplitSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\PrefabSplit\BelowZeroPrefabSplitSettings.Designer.cs">
+      <DependentUpon>BelowZeroPrefabSplitSettings.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\BelowZeroBaseSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\Dialogs\SplitGenerator.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Settings\Dialogs\SplitGenerator.Designer.cs">
+      <DependentUpon>SplitGenerator.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\BiomeSplit\BelowZeroBiomeSplit.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\BiomeSplit\BelowZeroBiomeSplit.Designer.cs">
+      <DependentUpon>BelowZeroBiomeSplit.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\BlueprintSplit\BelowZeroBlueprintSplit.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\BlueprintSplit\BelowZeroBlueprintSplit.Designer.cs">
+      <DependentUpon>BelowZeroBlueprintSplit.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\EncyclopediaSplit\BelowZeroEncyclopediaSplit.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\EncyclopediaSplit\BelowZeroEncyclopediaSplit.Designer.cs">
+      <DependentUpon>BelowZeroEncyclopediaSplit.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\ItemSplit\BelowZeroItemSplit.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\ItemSplit\BelowZeroItemSplit.Designer.cs">
+      <DependentUpon>BelowZeroItemSplit.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\PrefabSplit\BelowZeroPrefabSplit.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\PrefabSplit\BelowZeroPrefabSplit.Designer.cs">
+      <DependentUpon>BelowZeroPrefabSplit.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\BelowZeroSplitSetting.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="BelowZeroComponent.cs" />
+    <Compile Include="BelowZeroMemory.cs" />
+    <Compile Include="BelowZeroVersionedData.cs" />
+    <Compile Include="Settings\BelowZeroSettings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Settings\BelowZeroSettings.Designer.cs">
+      <DependentUpon>BelowZeroSettings.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Enums\TechType.cs" />
+    <Compile Include="Voxif.AutoSplitter\Component.cs" />
+    <Compile Include="Voxif.AutoSplitter\ExtensionMethods.cs" />
+    <Compile Include="Voxif.AutoSplitter\Factory.cs" />
+    <Compile Include="Voxif.AutoSplitter\Memory.cs" />
+    <Compile Include="Voxif.AutoSplitter\NativeMethods.cs" />
+    <Compile Include="Voxif.Helpers\HelperTask.cs" />
+    <Compile Include="Voxif.Helpers\ScanHelper.cs" />
+    <Compile Include="Voxif.Helpers\Voxif.Helpers.MemoryHelper\MemoryHelper.cs" />
+    <Compile Include="Voxif.Helpers\Voxif.Helpers.StructReflector\StructReflector.cs" />
+    <Compile Include="Voxif.Helpers\Voxif.Helpers.Unity\MonoNestedPointer.cs" />
+    <Compile Include="Voxif.Helpers\Voxif.Helpers.Unity\UnityHelper.cs" />
+    <Compile Include="Voxif.IO\Logger.cs" />
+    <Compile Include="Voxif.Memory\NestedPointer.cs" />
+    <Compile Include="Voxif.Memory\ProcessMethods.cs" />
+    <Compile Include="Voxif.Memory\ProcessWrapper.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\BiomeSplit\BelowZeroBiomeSplitSettings.resx">
+      <DependentUpon>BelowZeroBiomeSplitSettings.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\BlueprintSplit\BelowZeroBlueprintSplitSettings.resx">
+      <DependentUpon>BelowZeroBlueprintSplitSettings.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\CraftSplit\BelowZeroCraftSplit.resx">
+      <DependentUpon>BelowZeroCraftSplit.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\CraftSplit\BelowZeroCraftSplitSettings.resx">
+      <DependentUpon>BelowZeroCraftSplitSettings.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\EncyclopediaSplit\BelowZeroEncyclopediaSplitSettings.resx">
+      <DependentUpon>BelowZeroEncyclopediaSplitSettings.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\ItemSplit\BelowZeroItemSplitSettings.resx">
+      <DependentUpon>BelowZeroItemSplitSettings.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\Dialogs\SplitSettingsDialog.resx">
+      <DependentUpon>SplitSettingsDialog.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\Dialogs\SelectSplitType.resx">
+      <DependentUpon>SelectSplitType.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\BiomeSplit\BelowZeroBiomeSplit.resx">
+      <DependentUpon>BelowZeroBiomeSplit.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\BlueprintSplit\BelowZeroBlueprintSplit.resx">
+      <DependentUpon>BelowZeroBlueprintSplit.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\EncyclopediaSplit\BelowZeroEncyclopediaSplit.resx">
+      <DependentUpon>BelowZeroEncyclopediaSplit.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\PrefabSplit\BelowZeroPrefabSplitSettings.resx">
+      <DependentUpon>BelowZeroPrefabSplitSettings.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\BelowZeroSettings.resx">
+      <DependentUpon>BelowZeroSettings.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\ItemSplit\BelowZeroItemSplit.resx">
+      <DependentUpon>BelowZeroItemSplit.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings\PrefabSplit\BelowZeroPrefabSplit.resx">
+      <DependentUpon>BelowZeroPrefabSplit.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\English.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Voxif.Helpers\Voxif.Helpers.Unity\Il2cpp_2019.txt" />
+    <EmbeddedResource Include="Voxif.Helpers\Voxif.Helpers.Unity\Il2cpp_Base.txt" />
+    <EmbeddedResource Include="Voxif.Helpers\Voxif.Helpers.Unity\Mono_v1.txt" />
+    <EmbeddedResource Include="Voxif.Helpers\Voxif.Helpers.Unity\Mono_v1_cattrs.txt" />
+    <EmbeddedResource Include="Voxif.Helpers\Voxif.Helpers.Unity\Mono_v2.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="CustomFontDialog, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\CustomFontDialog.dll</HintPath>
+    </Reference>
+    <Reference Include="LiveSplit.Core, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\LiveSplit.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Memory, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json, Version=10.0.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="UpdateManager, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\UpdateManager.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <ProjectComponentsDir>$(MSBuildProjectDirectory)\..\Components\</ProjectComponentsDir>
+    <LiveSplitComponentsDir>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\Components\</LiveSplitComponentsDir>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Resources.Extensions, Version=9.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Program Files\dotnet\sdk\9.0.314\System.Resources.Extensions.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <Target Name="CopyComponentOutputs" AfterTargets="Build">
+    <MakeDir Directories="$(ProjectComponentsDir);$(LiveSplitComponentsDir)" />
+    <ItemGroup>
+      <ComponentOutputs Include="$(TargetPath)" />
+      <ComponentOutputs Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ComponentOutputs)" DestinationFolder="$(ProjectComponentsDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ComponentOutputs)" DestinationFolder="$(LiveSplitComponentsDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CleanReleaseSymbols" AfterTargets="CopyComponentOutputs" Condition="'$(Configuration)' == 'Release'">
+    <Delete Files="$(ProjectComponentsDir)$(TargetName).pdb;$(LiveSplitComponentsDir)$(TargetName).pdb" />
+  </Target>
+</Project>
+
