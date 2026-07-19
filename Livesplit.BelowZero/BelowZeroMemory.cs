@@ -27,6 +27,7 @@ namespace LiveSplit.BelowZero
 
         public bool startedTimerBefore;
         public bool isInMainMenu;
+        public bool wasInMainMenu;
         public bool pointersInitialized;
         public GameVersion gameVersion = BelowZeroVersionedData.BaselineVersion;
 
@@ -37,29 +38,6 @@ namespace LiveSplit.BelowZero
         private const int maxAcquireAlAnInteractionWindowMs = 5000;
         private const int acquireAlAnDestroyBurstWindowMs = 750;
         private const int maxBraceInteractionWindowMs = 120000;
-        private const float mainMenuPosX = 0f;
-        private const float mainMenuPosY = 1.75f;
-        private const float mainMenuPosZ = 0f;
-        private const float mainMenuPositionTolerance = 0.01f;
-        private const string SanctuaryBiome = "Precursor_Sanctuary";
-        private const string CrystalCavesCacheBiome = "CrystalCave_Cache";
-        private const string DeepLilypadsCacheBiome = "lilyPads_Deep_Cache";
-        private const string ArcticSpiresCacheBiome = "ArcticSpiresCache";
-        private const string PurpleVentsBiome = "purpleVents";
-        private const string TwistyBridgesBiome = "TwistyBridges";
-        private const string DeepTwistyBridgesBiome = "twistyBridges_Deep";
-        private const string ArcticKelpCaveInnerBiome = "ArcticKelp_CaveInner";
-        private const string ArcticKelpCaveOuterBiome = "ArcticKelp_CaveOuter";
-        private const string AcquireAlAnTooltipKey = "Alan_TerminalInteract";
-        private const string AcquireAlAnReticleText = "Insert storage medium";
-        private const string GoalSanctuaryCompleted = "SanctuaryCompleted";
-        private const string GoalEndGameEnterShip = "EndGameEnterShip";
-        // Reserved for future pillar-related prefabricated splits.
-        private const string GoalEndOfRepairPillar1 = "EndofRepairPillar1";
-        private const string GoalEndOfRepairPillar2 = "EndofRepairPillar2";
-        private const string GoalAlAnTransferred = "OnPrecursorNPCTransfer";
-        private const string GoalBodyBuilt = "Log_Alan_BodyBuilt";
-        private const string FabricationFacilityBiome = "Precursor_Fabricator";
         private static readonly Regex BuildTimeYearRegex = new Regex(@"(?<!\d)(20\d{2})(?!\d)", RegexOptions.Compiled);
         public readonly Dictionary<SplitName, Func<bool>> splitConditions;
         public readonly Dictionary<SplitName, Func<bool>> subConditions;
@@ -91,8 +69,8 @@ namespace LiveSplit.BelowZero
         private bool encyclopediaInitialized;
         private bool storyGoalsInitialized;
         private string storyGoalReaderMode = string.Empty;
-        private string acquireAlAnTargetGoalKey = string.Empty;
-        private string acquireAlAnArmedGoalKey = string.Empty;
+        private StoryGoal acquireAlAnTargetGoal = StoryGoal.None;
+        private StoryGoal acquireAlAnArmedGoal = StoryGoal.None;
         private bool heldMovementStartArmedAfterReset;
         private int playerInventorySlotsUsed;
         private int playerInventorySlotsUsedOld;
@@ -131,9 +109,9 @@ namespace LiveSplit.BelowZero
         public Pointer<int> CraftedNode;
         public StringPointer BiomeString;
         public StringPointer ActiveToolName;
-        public Pointer<float> PlayerLastPositionX;
-        public Pointer<float> PlayerLastPositionY;
-        public Pointer<float> PlayerLastPositionZ;
+        private Pointer<float> PlayerLastPositionX;
+        private Pointer<float> PlayerLastPositionY;
+        private Pointer<float> PlayerLastPositionZ;
         private Pointer<float> DirectPositionX;
         private Pointer<float> DirectPositionY;
         private Pointer<float> DirectPositionZ;
@@ -150,10 +128,9 @@ namespace LiveSplit.BelowZero
         public List<TechType> KnownTechOld = new List<TechType>();
         public List<EncyclopediaEntry> Encyclopedia = new List<EncyclopediaEntry>();
         public List<EncyclopediaEntry> EncyclopediaOld = new List<EncyclopediaEntry>();
-        private HashSet<string> completedStoryGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private HashSet<string> completedStoryGoalsOld = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private HashSet<string> storyGoalsCompletedThisFrame = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        public bool wasInMainMenu;
+        private HashSet<StoryGoal> completedStoryGoals = new HashSet<StoryGoal>();
+        private HashSet<StoryGoal> completedStoryGoalsOld = new HashSet<StoryGoal>();
+        private HashSet<StoryGoal> storyGoalsCompletedThisFrame = new HashSet<StoryGoal>();
         private readonly Dictionary<TechType, int> craftCounts = new Dictionary<TechType, int>();
         private readonly HashSet<TechType> suppressCraftCompletionFallback = new HashSet<TechType>();
 
@@ -245,180 +222,136 @@ namespace LiveSplit.BelowZero
                 }
             };
 
-            subConditions = new Dictionary<SplitName, Func<bool>>
+            subConditions = CreateSubConditions();
+            splitConditions = CreateSplitConditions();
+        }
+
+        private Dictionary<SplitName, Func<bool>> CreateSubConditions()
+        {
+            return new Dictionary<SplitName, Func<bool>>
             {
-                { SplitName.Inventory, () =>
-                    {
-                        var split = (ItemSplit)CurrentSplitToCheck;
-                        var techType = split.Item.ConvertTo<TechType>();
-                        return !split.IsCount
-                            ? HasPlayerItem(techType)
-                            : GetPlayerItemCount(techType) == split.Count;
-                    }
-                },
+                { SplitName.Inventory, IsInventorySubConditionMet },
                 { SplitName.Blueprint, () => KnownTech.Contains(((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>()) },
                 { SplitName.Encyclopedia, () => Encyclopedia.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) },
-                { SplitName.Biome, () =>
-                    {
-                        var biomeSplit = (BiomeSplit)CurrentSplitToCheck;
-                        return biomeSplit.Biomes.Biome1 == Biome.Any
-                            || string.Equals(BiomeString.New, biomeSplit.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase);
-                    }
-                },
+                { SplitName.Biome, IsBiomeSubConditionMet },
             };
+        }
 
-            splitConditions = new Dictionary<SplitName, Func<bool>>
+        private Dictionary<SplitName, Func<bool>> CreateSplitConditions()
+        {
+            return new Dictionary<SplitName, Func<bool>>
             {
-                {
-                    SplitName.Inventory,
-                    () =>
-                    {
-                        var split = (ItemSplit)CurrentSplitToCheck;
-                        var techType = split.Item.ConvertTo<TechType>();
-
-                        int currentPickUpChange = curPickUpCounts.TryGetValue(techType, out InvChangeInfo pickUpInfo) ? pickUpInfo.Count : 0;
-                        int currentDropChange = curDropCounts.TryGetValue(techType, out InvChangeInfo dropInfo) ? dropInfo.Count : 0;
-
-                        int change = split.PickUp ? currentPickUpChange : -currentDropChange;
-                        bool changedInRightDirection = change > 0;
-
-                        if (!split.IsCount)
-                        {
-                            int currentChange = currentInventoryChanges.TryGetValue(techType, out int delta) ? delta : 0;
-                            return split.PickUp ? currentChange > 0 : currentChange < 0;
-                        }
-
-                        if (split.AlreadySplitInvChanging)
-                            return false;
-
-                        bool shouldSplit = change >= split.Count && changedInRightDirection;
-                        split.AlreadySplitInvChanging = shouldSplit;
-                        return shouldSplit;
-                    }
-                },
-                {
-                    SplitName.Blueprint,
-                    () =>
-                    {
-                        TechType techType = ((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>();
-                        return KnownTech.Contains(techType) && !KnownTechOld.Contains(techType);
-                    }
-                },
-                {
-                    SplitName.Encyclopedia,
-                    () =>
-                    {
-                        EncyclopediaEntry entry = ((EncyclopediaSplit)CurrentSplitToCheck).Entry;
-                        return Encyclopedia.Contains(entry) && !EncyclopediaOld.Contains(entry);
-                    }
-                },
-                {
-                    SplitName.Biome,
-                    () =>
-                    {
-                        var biomeSplit = (BiomeSplit)CurrentSplitToCheck;
-                        return (biomeSplit.Biomes.Biome1 == Biome.Any && biomeSplit.Biomes.Biome2 == Biome.Any && BiomeString.Changed)
-                            || (biomeSplit.Biomes.Biome1 == Biome.Any && string.Equals(BiomeString.New, biomeSplit.Biomes.Biome2.ToString(), StringComparison.OrdinalIgnoreCase) && BiomeString.Changed)
-                            || (biomeSplit.Biomes.Biome2 == Biome.Any && string.Equals(BiomeString.Old, biomeSplit.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase) && BiomeString.Changed)
-                            || (string.Equals(BiomeString.New, biomeSplit.Biomes.Biome2.ToString(), StringComparison.OrdinalIgnoreCase)
-                                && string.Equals(BiomeString.Old, biomeSplit.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase));
-                    }
-                },
-                {
-                    SplitName.Craft,
-                    () =>
-                    {
-                        TechType techType = ((CraftSplit)CurrentSplitToCheck).Craftable.ConvertTo<TechType>();
-                        return TryConsumeStartedCraft(techType) || TryConsumeCompletedCraftFallback(techType);
-                    }
-                },
-                {
-                    SplitName.Build,
-                    () => TryConsumeCompletedBuild(((BuildSplit)CurrentSplitToCheck).Craftable.ConvertTo<TechType>())
-                },
+                { SplitName.Inventory, IsInventorySplitTriggered },
+                { SplitName.Blueprint, IsBlueprintSplitTriggered },
+                { SplitName.Encyclopedia, IsEncyclopediaSplitTriggered },
+                { SplitName.Biome, IsBiomeSplitTriggered },
+                { SplitName.Craft, IsCraftSplitTriggered },
+                { SplitName.Build, () => TryConsumeCompletedBuild(((BuildSplit)CurrentSplitToCheck).Craftable.ConvertTo<TechType>()) },
                 { SplitName.FullInventorySplit, () => playerInventorySlotsUsed == inventoryCapacitySlots && playerInventorySlotsUsedOld != inventoryCapacitySlots },
-                { SplitName.DeathSplit, () => (Health.New <= 0 && Health.Old > 0) || (IsDying.New && !IsDying.Old) },
+                { SplitName.DeathSplit, IsDeathThisFrame },
                 { SplitName.ThrowFlareSplit, () => TryConsumeThrownInventoryItem(TechType.Flare, "Flare") },
                 { SplitName.ThrowSnowballSplit, () => TryConsumeThrownInventoryItem(TechType.SnowBall, "Snowball") },
-                {
-                    SplitName.PropulsionCannonDrownSplit,
-                    () => IsDeathThisFrame()
-                        && IsCurrentBiome(ArcticKelpCaveInnerBiome, ArcticKelpCaveOuterBiome)
-                        && HasKnownTech(TechType.PropulsionCannon, TechType.PropulsionCannonBlueprint)
-                },
-                {
-                    SplitName.TwistyBridgesDeathSplit,
-                    () => IsDeathThisFrame()
-                        && IsCurrentBiome(TwistyBridgesBiome, DeepTwistyBridgesBiome)
-                },
+                { SplitName.PropulsionCannonDrownSplit, () => IsDeathThisFrame() && new[] { "ArcticKelp_CaveInner", "ArcticKelp_CaveOuter" }.Contains(BiomeString.New, StringComparer.OrdinalIgnoreCase) && HasKnownTech(TechType.PropulsionCannon, TechType.PropulsionCannonBlueprint) },
+                { SplitName.TwistyBridgesDeathSplit, () => IsDeathThisFrame() && new[] { "TwistyBridges", "twistyBridges_Deep" }.Contains(BiomeString.New, StringComparer.OrdinalIgnoreCase) },
                 { SplitName.AcquireAlAnSplit, TryConsumeAcquireAlAn },
-                {
-                    SplitName.BoosterTankDeathSplit,
-                    () => IsDeathThisFrame()
-                        && IsCurrentBiome(PurpleVentsBiome)
-                        && HasKnownTech(TechType.SuitBoosterTank)
-                },
-                {
-                    SplitName.ArcticSpiresScanSplit,
-                    () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCTissue)
-                },
-                {
-                    SplitName.ArcticSpiresDeathSplit,
-                    () => IsDeathThisFrame() && IsCurrentBiome(ArcticSpiresCacheBiome)
-                },
-                {
-                    SplitName.ArcticSpiresTransitionSplit,
-                    () => HasPlayableBiomeTransitionFrom(ArcticSpiresCacheBiome)
-                },
-                {
-                    SplitName.DeepLilypadsCacheScanSplit,
-                    () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCSkeleton)
-                },
-                {
-                    SplitName.DeepLilypadCacheDeathSplit,
-                    () => IsDeathThisFrame() && IsCurrentBiome(DeepLilypadsCacheBiome)
-                },
-                {
-                    SplitName.DeepLilypadsCacheTransitionSplit,
-                    () => HasPlayableBiomeTransitionFrom(DeepLilypadsCacheBiome)
-                },
-                {
-                    SplitName.CrystalCavesCacheScanSplit,
-                    () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCOrgans)
-                },
-                {
-                    SplitName.CrystalCavesCacheDeathSplit,
-                    () => IsDeathThisFrame() && IsCurrentBiome(CrystalCavesCacheBiome)
-                },
-                {
-                    SplitName.CrystalCavesCacheTransitionSplit,
-                    () => HasPlayableBiomeTransitionFrom(CrystalCavesCacheBiome)
-                },
-                {
-                    SplitName.CommenceStorageMediumFabricationSplit,
-                    () => TryConsumeStartedCraft(TechType.PrecursorNPCBody) || HasStoryGoalCompletedThisFrame(GoalBodyBuilt)
-                },
-                {
-                    SplitName.AlAnTransferSplit,
-                    () => HasTransferStartedThisFrame() || HasStoryGoalCompletedThisFrame(GoalAlAnTransferred)
-                },
-                {
-                    SplitName.AlAnTransferDeathSplit,
-                    () => IsDeathThisFrame()
-                        && IsCurrentBiome(FabricationFacilityBiome)
-                },
+                { SplitName.BoosterTankDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "purpleVents", StringComparison.OrdinalIgnoreCase) && HasKnownTech(TechType.SuitBoosterTank) },
+                { SplitName.ArcticSpiresScanSplit, () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCTissue) },
+                { SplitName.ArcticSpiresDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "ArcticSpiresCache", StringComparison.OrdinalIgnoreCase) },
+                { SplitName.ArcticSpiresTransitionSplit, () => HasPlayableBiomeTransitionFrom("ArcticSpiresCache") },
+                { SplitName.DeepLilypadsCacheScanSplit, () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCSkeleton) },
+                { SplitName.DeepLilypadCacheDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "lilyPads_Deep_Cache", StringComparison.OrdinalIgnoreCase) },
+                { SplitName.DeepLilypadsCacheTransitionSplit, () => HasPlayableBiomeTransitionFrom("lilyPads_Deep_Cache") },
+                { SplitName.CrystalCavesCacheScanSplit, () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCOrgans) },
+                { SplitName.CrystalCavesCacheDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "CrystalCave_Cache", StringComparison.OrdinalIgnoreCase) },
+                { SplitName.CrystalCavesCacheTransitionSplit, () => HasPlayableBiomeTransitionFrom("CrystalCave_Cache") },
+                { SplitName.CommenceStorageMediumFabricationSplit, () => TryConsumeStartedCraft(TechType.PrecursorNPCBody) || HasStoryGoalCompletedThisFrame(StoryGoal.Log_Alan_BodyBuilt) },
+                { SplitName.AlAnTransferSplit, () => HasTransferStartedThisFrame() || HasStoryGoalCompletedThisFrame(StoryGoal.OnPrecursorNPCTransfer) },
+                { SplitName.AlAnTransferDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "Precursor_Fabricator", StringComparison.OrdinalIgnoreCase) },
                 { SplitName.BraceSplit, TryConsumeBrace },
                 { SplitName.InsertHydraulicsFluidSplit, TryConsumeBridgeInsert },
             };
         }
 
+        private bool IsInventorySubConditionMet()
+        {
+            ItemSplit split = (ItemSplit)CurrentSplitToCheck;
+            TechType techType = split.Item.ConvertTo<TechType>();
+            return !split.IsCount ? HasPlayerItem(techType) : GetPlayerItemCount(techType) == split.Count;
+        }
+
+        private bool IsBiomeSubConditionMet()
+        {
+            BiomeSplit split = (BiomeSplit)CurrentSplitToCheck;
+            return split.Biomes.Biome1 == Biome.Any
+                || string.Equals(BiomeString.New, split.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsInventorySplitTriggered()
+        {
+            ItemSplit split = (ItemSplit)CurrentSplitToCheck;
+            TechType techType = split.Item.ConvertTo<TechType>();
+            int currentPickUpChange = curPickUpCounts.TryGetValue(techType, out InvChangeInfo pickUpInfo) ? pickUpInfo.Count : 0;
+            int currentDropChange = curDropCounts.TryGetValue(techType, out InvChangeInfo dropInfo) ? dropInfo.Count : 0;
+
+            if (!split.IsCount)
+            {
+                int currentChange = currentInventoryChanges.TryGetValue(techType, out int delta) ? delta : 0;
+                return split.PickUp ? currentChange > 0 : currentChange < 0;
+            }
+
+            if (split.AlreadySplitInvChanging)
+                return false;
+
+            int change = split.PickUp ? currentPickUpChange : -currentDropChange;
+            bool shouldSplit = change >= split.Count && change > 0;
+            split.AlreadySplitInvChanging = shouldSplit;
+            return shouldSplit;
+        }
+
+        private bool IsBlueprintSplitTriggered()
+        {
+            TechType techType = ((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>();
+            return KnownTech.Contains(techType) && !KnownTechOld.Contains(techType);
+        }
+
+        private bool IsEncyclopediaSplitTriggered()
+        {
+            EncyclopediaEntry entry = ((EncyclopediaSplit)CurrentSplitToCheck).Entry;
+            return Encyclopedia.Contains(entry) && !EncyclopediaOld.Contains(entry);
+        }
+
+        private bool IsBiomeSplitTriggered()
+        {
+            BiomeSplit split = (BiomeSplit)CurrentSplitToCheck;
+            return (split.Biomes.Biome1 == Biome.Any && split.Biomes.Biome2 == Biome.Any && BiomeString.Changed)
+                || (split.Biomes.Biome1 == Biome.Any && string.Equals(BiomeString.New, split.Biomes.Biome2.ToString(), StringComparison.OrdinalIgnoreCase) && BiomeString.Changed)
+                || (split.Biomes.Biome2 == Biome.Any && string.Equals(BiomeString.Old, split.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase) && BiomeString.Changed)
+                || (string.Equals(BiomeString.New, split.Biomes.Biome2.ToString(), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(BiomeString.Old, split.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        private bool IsCraftSplitTriggered()
+        {
+            TechType techType = ((CraftSplit)CurrentSplitToCheck).Craftable.ConvertTo<TechType>();
+            return TryConsumeStartedCraft(techType) || TryConsumeCompletedCraftFallback(techType);
+        }
+
         public override bool Update()
         {
-            if (!base.Update() || !pointersInitialized || game == null)
+            if (!base.Update())
+                return false;
+
+            if (!pointersInitialized || game == null)
                 return false;
 
             RefreshVersionSpecificSignalPointersIfNeeded();
+            UpdateMainMenuState();
+            UpdateMemoryWatchers();
+            return true;
+        }
 
+        private void UpdateMainMenuState()
+        {
             wasInMainMenu = isInMainMenu;
             isInMainMenu = IsInMainMenu();
             if (isInMainMenu)
@@ -427,13 +360,15 @@ namespace LiveSplit.BelowZero
                     logger.Log("Main menu entered.");
 
                 ResetRunState();
-                startedTimerBefore = false;
             }
             else if (wasInMainMenu)
             {
                 logger.Log("Left main menu.");
             }
+        }
 
+        private void UpdateMemoryWatchers()
+        {
             if (settings.StartEnabled || Needs(SplitName.Inventory, SplitName.FullInventorySplit, SplitName.ThrowFlareSplit, SplitName.ThrowSnowballSplit, SplitName.InsertHydraulicsFluidSplit))
                 UpdateInventory();
 
@@ -466,8 +401,6 @@ namespace LiveSplit.BelowZero
 
             if (Needs(SplitName.InsertHydraulicsFluidSplit))
                 UpdateBridgeInteractiveState();
-
-            return true;
         }
 
         private void GetGameVersion()
@@ -991,6 +924,34 @@ namespace LiveSplit.BelowZero
             return IsMainMenuPosition(PlayerLastPositionX?.New ?? float.NaN, PlayerLastPositionY?.New ?? float.NaN, PlayerLastPositionZ?.New ?? float.NaN);
         }
 
+        private bool IsWithinBounds(float[] bounds, bool old = false)
+        {
+            if (bounds == null || bounds.Length < 6 || !TryGetPlayerPosition(old, out float x, out float y, out float z))
+                return false;
+
+            return x >= Math.Min(bounds[0], bounds[1]) && x <= Math.Max(bounds[0], bounds[1])
+                && y >= Math.Min(bounds[2], bounds[3]) && y <= Math.Max(bounds[2], bounds[3])
+                && z >= Math.Min(bounds[4], bounds[5]) && z <= Math.Max(bounds[4], bounds[5]);
+        }
+
+        private bool TryGetPlayerPosition(bool old, out float x, out float y, out float z)
+        {
+            if (directPositionPointersBound && TryReadPosition(DirectPositionX, DirectPositionY, DirectPositionZ, old, out x, out y, out z))
+                return true;
+
+            return TryReadPosition(PlayerLastPositionX, PlayerLastPositionY, PlayerLastPositionZ, old, out x, out y, out z);
+        }
+
+        private static bool TryReadPosition(Pointer<float> xPointer, Pointer<float> yPointer, Pointer<float> zPointer, bool old, out float x, out float y, out float z)
+        {
+            x = old ? xPointer?.Old ?? float.NaN : xPointer?.New ?? float.NaN;
+            y = old ? yPointer?.Old ?? float.NaN : yPointer?.New ?? float.NaN;
+            z = old ? zPointer?.Old ?? float.NaN : zPointer?.New ?? float.NaN;
+            return !float.IsNaN(x) && !float.IsInfinity(x)
+                && !float.IsNaN(y) && !float.IsInfinity(y)
+                && !float.IsNaN(z) && !float.IsInfinity(z);
+        }
+
         public bool ShouldPause() => false;
 
         private void UpdateBlueprints()
@@ -1192,33 +1153,33 @@ namespace LiveSplit.BelowZero
 
         private void UpdateCompletedStoryGoals()
         {
-            HashSet<string> currentGoals = ReadCompletedStoryGoals();
+            HashSet<StoryGoal> currentGoals = ReadCompletedStoryGoals();
             storyGoalsCompletedThisFrame.Clear();
             if (!storyGoalsInitialized)
             {
                 completedStoryGoals = currentGoals;
-                completedStoryGoalsOld = new HashSet<string>(currentGoals, StringComparer.OrdinalIgnoreCase);
+                completedStoryGoalsOld = new HashSet<StoryGoal>(currentGoals);
                 storyGoalsInitialized = true;
                 return;
             }
 
             completedStoryGoalsOld = completedStoryGoals;
             completedStoryGoals = currentGoals;
-            foreach (string goalKey in completedStoryGoals)
+            foreach (StoryGoal goal in completedStoryGoals)
             {
-                if (completedStoryGoalsOld.Contains(goalKey))
+                if (completedStoryGoalsOld.Contains(goal))
                     continue;
 
-                storyGoalsCompletedThisFrame.Add(goalKey);
-                logger.Log($"Story goal completed: {goalKey}");
+                storyGoalsCompletedThisFrame.Add(goal);
+                logger.Log($"Story goal completed: {goal}");
             }
         }
 
-        private bool HasStoryGoalCompletedThisFrame(string goalKey)
+        private bool HasStoryGoalCompletedThisFrame(StoryGoal goal)
         {
-            return !string.IsNullOrEmpty(goalKey)
-                && completedStoryGoals.Contains(goalKey)
-                && !completedStoryGoalsOld.Contains(goalKey);
+            return goal != StoryGoal.None
+                && completedStoryGoals.Contains(goal)
+                && !completedStoryGoalsOld.Contains(goal);
         }
 
         private bool HasTransferStartedThisFrame()
@@ -1231,7 +1192,7 @@ namespace LiveSplit.BelowZero
 
         private bool TryConsumeBrace()
         {
-            if (HasStoryGoalCompletedThisFrame(GoalEndGameEnterShip))
+            if (HasStoryGoalCompletedThisFrame(StoryGoal.EndGameEnterShip))
             {
                 braceInteractionWindow.Restart();
                 braceReadyForCinematic = false;
@@ -1279,7 +1240,7 @@ namespace LiveSplit.BelowZero
                 return true;
             }
 
-            if (HasStoryGoalCompletedThisFrame(GoalSanctuaryCompleted))
+            if (HasStoryGoalCompletedThisFrame(StoryGoal.SanctuaryCompleted))
             {
                 ClearAcquireAlAnArmedState();
                 logger.Log("Acquire Al-An split: SanctuaryCompleted story goal.");
@@ -1295,10 +1256,10 @@ namespace LiveSplit.BelowZero
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(acquireAlAnArmedGoalKey)
-                && storyGoalsCompletedThisFrame.Contains(acquireAlAnArmedGoalKey))
+            if (acquireAlAnArmedGoal != StoryGoal.None
+                && storyGoalsCompletedThisFrame.Contains(acquireAlAnArmedGoal))
             {
-                logger.Log($"Acquire Al-An split: armed story goal completed ({acquireAlAnArmedGoalKey}).");
+                logger.Log($"Acquire Al-An split: armed story goal completed ({acquireAlAnArmedGoal}).");
                 ClearAcquireAlAnArmedState();
                 return true;
             }
@@ -1309,16 +1270,6 @@ namespace LiveSplit.BelowZero
         private bool IsDeathThisFrame()
         {
             return (Health.New <= 0 && Health.Old > 0) || (IsDying.New && !IsDying.Old);
-        }
-
-        private bool IsCurrentBiome(params string[] biomeNames)
-        {
-            if (biomeNames == null || biomeNames.Length == 0 || string.IsNullOrWhiteSpace(BiomeString.New))
-                return false;
-
-            return biomeNames.Any(biomeName =>
-                !string.IsNullOrEmpty(biomeName)
-                && string.Equals(BiomeString.New, biomeName, StringComparison.OrdinalIgnoreCase));
         }
 
         private bool IsPlayableBiome(string biomeName)
@@ -1359,13 +1310,13 @@ namespace LiveSplit.BelowZero
         private static bool IsSanctuaryBiome(string biomeName)
         {
             return !string.IsNullOrEmpty(biomeName)
-                && biomeName.StartsWith(SanctuaryBiome, StringComparison.OrdinalIgnoreCase);
+                && biomeName.StartsWith("Precursor_Sanctuary", StringComparison.OrdinalIgnoreCase);
         }
 
         private void ClearAcquireAlAnArmedState()
         {
             acquireAlAnInteractionWindow.Reset();
-            acquireAlAnArmedGoalKey = string.Empty;
+            acquireAlAnArmedGoal = StoryGoal.None;
             acquireAlAnDestroyBurstWindow.Reset();
         }
 
@@ -1574,7 +1525,7 @@ namespace LiveSplit.BelowZero
         private void CaptureTrackedInteractiveTargets()
         {
             IntPtr previousAcquireAlAnTargetPtr = acquireAlAnTargetPtr;
-            string previousAcquireAlAnGoalKey = acquireAlAnTargetGoalKey;
+            StoryGoal previousAcquireAlAnGoal = acquireAlAnTargetGoal;
             bool previousAcquireAlAnTargetActive = acquireAlAnTargetActive;
             bool trackAcquireAlAn = Needs(SplitName.AcquireAlAnSplit) && IsSanctuaryBiome();
             string acquireAlAnReticleText = trackAcquireAlAn ? GetHandReticleText() : string.Empty;
@@ -1582,7 +1533,7 @@ namespace LiveSplit.BelowZero
 
             acquireAlAnTargetActive = false;
             acquireAlAnTargetPtr = IntPtr.Zero;
-            acquireAlAnTargetGoalKey = string.Empty;
+            acquireAlAnTargetGoal = StoryGoal.None;
 
             IntPtr activeTarget = GuiHandActiveTarget?.New ?? IntPtr.Zero;
             if (activeTarget != IntPtr.Zero
@@ -1590,13 +1541,13 @@ namespace LiveSplit.BelowZero
                 && !string.IsNullOrEmpty(typeName))
             {
                 if (string.Equals(typeName, "StoryHandTarget", StringComparison.OrdinalIgnoreCase)
-                    && TryReadStoryHandTargetInfo(activeTarget, out string primaryTooltip, out string secondaryTooltip, out string goalKey))
+                    && TryReadStoryHandTargetInfo(activeTarget, out string primaryTooltip, out string secondaryTooltip, out StoryGoal goal))
                 {
                     if (IsSanctuaryBiome() && IsAcquireAlAnStoryTarget(primaryTooltip, secondaryTooltip))
                     {
                         acquireAlAnTargetActive = true;
                         acquireAlAnTargetPtr = activeTarget;
-                        acquireAlAnTargetGoalKey = goalKey ?? string.Empty;
+                        acquireAlAnTargetGoal = goal;
                     }
                 }
 
@@ -1629,7 +1580,7 @@ namespace LiveSplit.BelowZero
             if (previousAcquireAlAnTargetActive
                 && (!acquireAlAnTargetActive || previousAcquireAlAnTargetPtr != acquireAlAnTargetPtr))
             {
-                ArmAcquireAlAnFromTargetLoss(previousAcquireAlAnTargetPtr, previousAcquireAlAnGoalKey);
+                ArmAcquireAlAnFromTargetLoss(previousAcquireAlAnTargetPtr, previousAcquireAlAnGoal);
             }
         }
 
@@ -1665,11 +1616,11 @@ namespace LiveSplit.BelowZero
             return game.Read<IntPtr>(objectPtr + offset);
         }
 
-        private bool TryReadStoryHandTargetInfo(IntPtr storyHandTargetPtr, out string primaryTooltip, out string secondaryTooltip, out string goalKey)
+        private bool TryReadStoryHandTargetInfo(IntPtr storyHandTargetPtr, out string primaryTooltip, out string secondaryTooltip, out StoryGoal goal)
         {
             primaryTooltip = string.Empty;
             secondaryTooltip = string.Empty;
-            goalKey = string.Empty;
+            goal = StoryGoal.None;
 
             if (storyHandTargetPtr == IntPtr.Zero)
                 return false;
@@ -1684,7 +1635,7 @@ namespace LiveSplit.BelowZero
 
                 IntPtr goalPtr = ReadObjectFieldPointer(storyHandTargetPtr, off_storyHandTargetGoal);
                 if (goalPtr != IntPtr.Zero && off_storyGoalKey != 0)
-                    goalKey = ReadManagedStringObject(ReadObjectFieldPointer(goalPtr, off_storyGoalKey));
+                    TryParseStoryGoal(ReadManagedStringObject(ReadObjectFieldPointer(goalPtr, off_storyGoalKey)), out goal);
 
                 return true;
             }
@@ -1713,8 +1664,8 @@ namespace LiveSplit.BelowZero
 
         private bool IsAcquireAlAnStoryTarget(string primaryTooltip, string secondaryTooltip)
         {
-            return string.Equals(primaryTooltip, AcquireAlAnTooltipKey, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(secondaryTooltip, AcquireAlAnTooltipKey, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(primaryTooltip, "Alan_TerminalInteract", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(secondaryTooltip, "Alan_TerminalInteract", StringComparison.OrdinalIgnoreCase);
         }
 
         private string GetHandReticleText()
@@ -1730,23 +1681,23 @@ namespace LiveSplit.BelowZero
         private static bool IsAcquireAlAnReticleText(string text)
         {
             return !string.IsNullOrWhiteSpace(text)
-                && (text.StartsWith(AcquireAlAnReticleText, StringComparison.OrdinalIgnoreCase)
-                    || text.StartsWith(AcquireAlAnTooltipKey, StringComparison.OrdinalIgnoreCase));
+                && (text.StartsWith("Insert storage medium", StringComparison.OrdinalIgnoreCase)
+                    || text.StartsWith("Alan_TerminalInteract", StringComparison.OrdinalIgnoreCase));
         }
 
-        private void ArmAcquireAlAnFromTargetLoss(IntPtr previousTargetPtr, string previousGoalKey)
+        private void ArmAcquireAlAnFromTargetLoss(IntPtr previousTargetPtr, StoryGoal previousGoal)
         {
             bool targetDestroyed = previousTargetPtr != IntPtr.Zero && !IsLiveManagedUnityObject(previousTargetPtr);
-            if (!targetDestroyed && string.IsNullOrEmpty(previousGoalKey))
+            if (!targetDestroyed && previousGoal == StoryGoal.None)
                 return;
 
-            acquireAlAnArmedGoalKey = previousGoalKey ?? string.Empty;
+            acquireAlAnArmedGoal = previousGoal;
             acquireAlAnInteractionWindow.Restart();
 
-            if (string.IsNullOrEmpty(acquireAlAnArmedGoalKey))
+            if (acquireAlAnArmedGoal == StoryGoal.None)
                 logger.Log("Acquire Al-An target lost; interaction window armed.");
             else
-                logger.Log($"Acquire Al-An target lost; armed goal {acquireAlAnArmedGoalKey}.");
+                logger.Log($"Acquire Al-An target lost; armed goal {acquireAlAnArmedGoal}.");
 
             if (targetDestroyed)
             {
@@ -1924,9 +1875,9 @@ namespace LiveSplit.BelowZero
             craftCounts.Clear();
             suppressCraftCompletionFallback.Clear();
             storyGoalsInitialized = false;
-            completedStoryGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            completedStoryGoalsOld = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            storyGoalsCompletedThisFrame = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            completedStoryGoals = new HashSet<StoryGoal>();
+            completedStoryGoalsOld = new HashSet<StoryGoal>();
+            storyGoalsCompletedThisFrame = new HashSet<StoryGoal>();
             storyGoalReaderMode = string.Empty;
             pendingBuilderCompletionTechType = TechType.None;
             builderMenuSelectionPending = false;
@@ -1937,8 +1888,8 @@ namespace LiveSplit.BelowZero
             braceInteractionWindow.Reset();
             braceReadyForCinematic = false;
             acquireAlAnTargetActive = false;
-            acquireAlAnTargetGoalKey = string.Empty;
-            acquireAlAnArmedGoalKey = string.Empty;
+            acquireAlAnTargetGoal = StoryGoal.None;
+            acquireAlAnArmedGoal = StoryGoal.None;
             acquireAlAnTargetPtr = IntPtr.Zero;
             trackedHoverpadConstructorPtr = IntPtr.Zero;
             hoverpadConstructingInitialized = false;
@@ -2157,9 +2108,9 @@ namespace LiveSplit.BelowZero
             if (float.IsNaN(x) || float.IsNaN(y) || float.IsNaN(z))
                 return false;
 
-            return Math.Abs(x - mainMenuPosX) <= mainMenuPositionTolerance
-                && Math.Abs(y - mainMenuPosY) <= mainMenuPositionTolerance
-                && Math.Abs(z - mainMenuPosZ) <= mainMenuPositionTolerance;
+            return Math.Abs(x) <= 0.01f
+                && Math.Abs(y - 1.75f) <= 0.01f
+                && Math.Abs(z) <= 0.01f;
         }
 
         private List<TechType> ReadEquipmentTypes()
@@ -2395,26 +2346,26 @@ namespace LiveSplit.BelowZero
             return result;
         }
 
-        private HashSet<string> ReadCompletedStoryGoals()
+        private HashSet<StoryGoal> ReadCompletedStoryGoals()
         {
             IntPtr hashSetPtr = completedStoryGoalsPtr?.New ?? IntPtr.Zero;
             if (hashSetPtr == IntPtr.Zero || hashset_off_slots == 0)
-                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                return new HashSet<StoryGoal>();
 
             int stringHeader = game.PointerSize * 2 + 0x4;
-            var candidates = new List<(HashSet<string> Goals, string Mode, int Score)>();
+            var candidates = new List<(HashSet<StoryGoal> Goals, string Mode, int Score)>();
 
             foreach (int slotsOffset in new[] { hashset_off_slots, 0x18, 0x20, 0x10 }.Distinct())
             {
-                if (TryReadStoryGoalsFromSlotArray(hashSetPtr, slotsOffset, stringHeader, out HashSet<string> slotGoals))
+                if (TryReadStoryGoalsFromSlotArray(hashSetPtr, slotsOffset, stringHeader, out HashSet<StoryGoal> slotGoals))
                     candidates.Add((slotGoals, $"slot-array@0x{slotsOffset:X}", ScoreGoalSet(slotGoals)));
 
-                if (TryReadStoryGoalsFromStringArray(hashSetPtr, slotsOffset, stringHeader, out HashSet<string> stringGoals))
+                if (TryReadStoryGoalsFromStringArray(hashSetPtr, slotsOffset, stringHeader, out HashSet<StoryGoal> stringGoals))
                     candidates.Add((stringGoals, $"string-array@0x{slotsOffset:X}", ScoreGoalSet(stringGoals)));
             }
 
             if (candidates.Count == 0)
-                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                return new HashSet<StoryGoal>();
 
             var best = candidates
                 .OrderByDescending(candidate => candidate.Score)
@@ -2430,9 +2381,9 @@ namespace LiveSplit.BelowZero
             return best.Goals;
         }
 
-        private bool TryReadStoryGoalsFromSlotArray(IntPtr hashSetPtr, int slotsOffset, int stringHeader, out HashSet<string> result)
+        private bool TryReadStoryGoalsFromSlotArray(IntPtr hashSetPtr, int slotsOffset, int stringHeader, out HashSet<StoryGoal> result)
         {
-            result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            result = new HashSet<StoryGoal>();
             IntPtr slotsArr = game.Read<IntPtr>(hashSetPtr + slotsOffset);
             if (slotsArr == IntPtr.Zero)
                 return false;
@@ -2451,16 +2402,16 @@ namespace LiveSplit.BelowZero
                     continue;
 
                 IntPtr valuePtr = game.Read<IntPtr>(entry + 0x08);
-                if (TryReadGoalKey(valuePtr, stringHeader, out string goalKey))
-                    result.Add(goalKey);
+                if (TryReadStoryGoal(valuePtr, stringHeader, out StoryGoal goal))
+                    result.Add(goal);
             }
 
             return result.Count > 0;
         }
 
-        private bool TryReadStoryGoalsFromStringArray(IntPtr hashSetPtr, int slotsOffset, int stringHeader, out HashSet<string> result)
+        private bool TryReadStoryGoalsFromStringArray(IntPtr hashSetPtr, int slotsOffset, int stringHeader, out HashSet<StoryGoal> result)
         {
-            result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            result = new HashSet<StoryGoal>();
             IntPtr slotsArr = game.Read<IntPtr>(hashSetPtr + slotsOffset);
             if (slotsArr == IntPtr.Zero)
                 return false;
@@ -2473,27 +2424,23 @@ namespace LiveSplit.BelowZero
             for (int i = 0; i < len; i++)
             {
                 IntPtr valuePtr = game.Read<IntPtr>(basePtr + i * game.PointerSize);
-                if (TryReadGoalKey(valuePtr, stringHeader, out string goalKey))
-                    result.Add(goalKey);
+                if (TryReadStoryGoal(valuePtr, stringHeader, out StoryGoal goal))
+                    result.Add(goal);
             }
 
             return result.Count > 0;
         }
 
-        private bool TryReadGoalKey(IntPtr valuePtr, int stringHeader, out string goalKey)
+        private bool TryReadStoryGoal(IntPtr valuePtr, int stringHeader, out StoryGoal goal)
         {
-            goalKey = null;
+            goal = StoryGoal.None;
             if (valuePtr == IntPtr.Zero)
                 return false;
 
             try
             {
                 string value = game.ReadString(valuePtr + stringHeader, EStringType.UTF16Sized);
-                if (!IsLikelyStoryGoalKey(value))
-                    return false;
-
-                goalKey = value;
-                return true;
+                return TryParseStoryGoal(value, out goal);
             }
             catch
             {
@@ -2501,41 +2448,34 @@ namespace LiveSplit.BelowZero
             }
         }
 
-        private static bool IsLikelyStoryGoalKey(string value)
+        private static bool TryParseStoryGoal(string value, out StoryGoal goal)
         {
-            if (string.IsNullOrWhiteSpace(value) || value.Length > 128)
-                return false;
-
-            for (int i = 0; i < value.Length; i++)
-            {
-                char c = value[i];
-                if (!(char.IsLetterOrDigit(c) || c == '_' || c == '.' || c == '-'))
-                    return false;
-            }
-
-            return true;
+            return Enum.TryParse(value, true, out goal)
+                && goal != StoryGoal.None
+                && Enum.IsDefined(typeof(StoryGoal), goal);
         }
 
-        private static int ScoreGoalSet(HashSet<string> goals)
+        private static int ScoreGoalSet(HashSet<StoryGoal> goals)
         {
             int score = 0;
-            foreach (string goal in goals)
+            foreach (StoryGoal goal in goals)
             {
                 score += 1;
 
-                if (string.Equals(goal, GoalSanctuaryCompleted, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(goal, GoalEndGameEnterShip, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(goal, GoalAlAnTransferred, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(goal, GoalBodyBuilt, StringComparison.OrdinalIgnoreCase))
+                if (new[] { StoryGoal.SanctuaryCompleted, StoryGoal.EndGameEnterShip, StoryGoal.OnPrecursorNPCTransfer, StoryGoal.Log_Alan_BodyBuilt }.Contains(goal))
                 {
                     score += 100;
                 }
-                else if (goal.StartsWith("On", StringComparison.OrdinalIgnoreCase)
-                    || goal.StartsWith("Log_", StringComparison.OrdinalIgnoreCase)
-                    || goal.StartsWith("Call_", StringComparison.OrdinalIgnoreCase)
-                    || goal.StartsWith("Scan_", StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    score += 3;
+                    string name = goal.ToString();
+                    if (name.StartsWith("On", StringComparison.Ordinal)
+                        || name.StartsWith("Log_", StringComparison.Ordinal)
+                        || name.StartsWith("Call_", StringComparison.Ordinal)
+                        || name.StartsWith("Scan_", StringComparison.Ordinal))
+                    {
+                        score += 3;
+                    }
                 }
             }
 

@@ -44,6 +44,7 @@
     <Compile Include="Enums\PDAState.cs" />
     <Compile Include="Enums\PDATab.cs" />
     <Compile Include="Enums\GameVersion.cs" />
+    <Compile Include="Enums\StoryGoal.cs" />
     <Compile Include="Enums\PlayerMode.cs" />
     <Compile Include="Enums\Unlockable.cs" />
     <Compile Include="Localization.cs" />
