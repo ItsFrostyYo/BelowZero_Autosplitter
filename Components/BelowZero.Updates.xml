@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <updates>
+    <update version="1.1.0.7">
+        <files>
+            <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>
+        </files>
+        <changelog>
+            <change>Small Cleanup with Enum Updates and Optimization</change>
+        </changelog>
+    </update>
     <update version="1.0.0.0">
         <files>
             <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>
