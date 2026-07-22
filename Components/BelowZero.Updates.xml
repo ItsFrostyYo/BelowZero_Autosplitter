@@ -11,14 +11,6 @@
             <change>Update Internal Helpers, Remove Useless ones, Change Names, Add New Ones for Specific Things</change>
         </changelog>
     </update>
-    <update version="1.0.0.0">
-        <files>
-            <file path="Components/LiveSplit.DropPodLocation.dll" status="changed"/>
-        </files>
-        <changelog>
-            <change>Added Log Based Drop Pod Location Resolver</change>
-        </changelog>
-    </update>
     <update version="1.2.0.0">
         <files>
             <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>
