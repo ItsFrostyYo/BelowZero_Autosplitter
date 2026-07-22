@@ -34,6 +34,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Enums\Achievement.cs" />
     <Compile Include="Enums\Artifact.cs" />
     <Compile Include="Enums\Biome.cs" />
     <Compile Include="Enums\Craftable.cs" />

@@ -13,17 +13,22 @@ namespace LiveSplit.BelowZero.Settings
             List<SplitType> items = new List<SplitType>();
 
             if (!isSubCondition)
+                items.Add(new SplitType { Text = "Pre-Made Conditions", Func = settings.CreatePrefabSplit });
+
+            items.Add(new SplitType { Text = "Achievements", Func = settings.CreateAchievementSplit });
+            items.Add(new SplitType { Text = "Artifacts", Func = settings.CreateArtifactSplit });
+            items.Add(new SplitType { Text = "Blueprints", Func = settings.CreateBlueprintSplit });
+            items.Add(new SplitType { Text = "Databanks", Func = settings.CreateEncyclopediaSplit });
+            items.Add(new SplitType { Text = "Inventory", Func = settings.CreateItemSplit });
+
+            if (!isSubCondition)
             {
-                items.Add(new SplitType { Text = "Prefabricated", Func = settings.CreatePrefabSplit });
                 items.Add(new SplitType { Text = "Craft", Func = settings.CreateCraftSplit });
                 items.Add(new SplitType { Text = "Build", Func = settings.CreateBuildSplit });
             }
 
-            items.Add(new SplitType { Text = "Inventory", Func = settings.CreateItemSplit });
-            items.Add(new SplitType { Text = "Blueprint", Func = settings.CreateBlueprintSplit });
-            items.Add(new SplitType { Text = "Encyclopedia", Func = settings.CreateEncyclopediaSplit });
-            items.Add(new SplitType { Text = "Artifacts", Func = settings.CreateArtifactSplit });
             items.Add(new SplitType { Text = "Biome", Func = settings.CreateBiomeSplit });
+            items.Add(new SplitType { Text = "Story Goals", Func = settings.CreateStoryGoalSplit });
 
             cboSplitType.DisplayMember = nameof(SplitType.Text);
             cboSplitType.ValueMember = nameof(SplitType.Func);

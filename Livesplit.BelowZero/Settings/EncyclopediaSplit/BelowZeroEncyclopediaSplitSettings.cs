@@ -31,7 +31,7 @@ namespace LiveSplit.BelowZero
         private void flowMain_DragOver(object sender, DragEventArgs e) => flowMainDragOver(sender, e);
         private void RdSort_CheckedChanged(object sender, EventArgs e) => RdSortCheckedChanged(sender, e);
 
-        public BelowZeroEncyclopediaSplitSettings(EncyclopediaSplit split)
+        public BelowZeroEncyclopediaSplitSettings(BelowZeroSplit split)
         {
             InitializeComponent();
 

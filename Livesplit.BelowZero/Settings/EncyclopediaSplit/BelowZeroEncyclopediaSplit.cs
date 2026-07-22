@@ -10,19 +10,25 @@ namespace LiveSplit.BelowZero
 {
     public partial class BelowZeroEncyclopediaSplit : BelowZeroSplitSetting
     {
-        public EncyclopediaSplit _split;
+        public BelowZeroSplit _split;
 
         private int mX = 0;
         private int mY = 0;
         private bool isDragging = false;
 
         public BelowZeroEncyclopediaSplit() : this(new EncyclopediaSplit(EncyclopediaEntry.None, onlySplitOnce: true, isSubCondition: false)) { }
-        public BelowZeroEncyclopediaSplit(EncyclopediaSplit encySplit)
+        public BelowZeroEncyclopediaSplit(BelowZeroSplit encySplit)
         {
             InitializeComponent();
 
             _split = encySplit ?? new EncyclopediaSplit(EncyclopediaEntry.None, onlySplitOnce: true, isSubCondition: false);
-            l_name.Text = _split is ArtifactSplit ? "Artifacts" : "Encyclopedia";
+            l_name.Text = _split is ArtifactSplit ? "Artifacts"
+                : _split is StoryGoalSplit ? "Story Goal"
+                : _split is AchievementSplit ? "Achievement"
+                : "Encyclopedia";
+
+            if (_split.SplitName == SplitName.Encyclopedia)
+                cboEncy.Width = 341;
 
             cboEncy.DropDownStyle = ComboBoxStyle.DropDownList;
             cboEncy.MouseWheel += (o, e) => ((HandledMouseEventArgs)e).Handled = true;
@@ -44,13 +50,36 @@ namespace LiveSplit.BelowZero
 
         private void cboName_SelectedIndexChanged(object sender, EventArgs e)
         {
+            UpdateSelectedValueToolTip();
+
             if (IsLoading)
                 return;
 
             if (_split is ArtifactSplit artifactSplit && cboEncy.SelectedValue is Artifact artifact)
                 artifactSplit.Artifact = artifact;
-            else if (cboEncy.SelectedValue is EncyclopediaEntry entry)
-                _split.Entry = entry;
+            else if (_split is EncyclopediaSplit encyclopediaSplit && cboEncy.SelectedValue is EncyclopediaEntry entry)
+                encyclopediaSplit.Entry = entry;
+            else if (_split is StoryGoalSplit storyGoalSplit && cboEncy.SelectedValue is StoryGoal storyGoal)
+                storyGoalSplit.Goal = storyGoal;
+            else if (_split is AchievementSplit achievementSplit && cboEncy.SelectedValue is Achievement achievement)
+                achievementSplit.Achievement = achievement;
+        }
+
+        private void UpdateSelectedValueToolTip()
+        {
+            if (!(cboEncy.SelectedValue is Enum selectedValue))
+            {
+                ToolTips.SetToolTip(cboEncy, string.Empty);
+                return;
+            }
+
+            var member = selectedValue.GetType().GetMember(selectedValue.ToString()).FirstOrDefault();
+            var toolTip = member?
+                .GetCustomAttributes(typeof(ToolTipAttribute), inherit: false)
+                .OfType<ToolTipAttribute>()
+                .FirstOrDefault();
+
+            ToolTips.SetToolTip(cboEncy, toolTip?.ToolTip ?? string.Empty);
         }
 
         private void picHandle_MouseMove(object sender, MouseEventArgs e)
@@ -121,6 +150,36 @@ namespace LiveSplit.BelowZero
         }
 
         public override string GetDescription() => $"Scan {Localization.GetDisplayName(Artifact)}";
+    }
+
+    public class StoryGoalSplit : BelowZeroSplit
+    {
+        public StoryGoal Goal { get; set; }
+
+        public StoryGoalSplit(StoryGoal goal, bool onlySplitOnce, bool isSubCondition)
+        {
+            Goal = goal;
+            OnlySplitOnce = onlySplitOnce;
+            SplitName = SplitName.StoryGoal;
+            IsSubCondition = isSubCondition;
+        }
+
+        public override string GetDescription() => Goal.ToString();
+    }
+
+    public class AchievementSplit : BelowZeroSplit
+    {
+        public Achievement Achievement { get; set; }
+
+        public AchievementSplit(Achievement achievement, bool onlySplitOnce, bool isSubCondition)
+        {
+            Achievement = achievement;
+            OnlySplitOnce = onlySplitOnce;
+            SplitName = SplitName.Achievement;
+            IsSubCondition = isSubCondition;
+        }
+
+        public override string GetDescription() => Achievement.GetDescription();
     }
 }
 

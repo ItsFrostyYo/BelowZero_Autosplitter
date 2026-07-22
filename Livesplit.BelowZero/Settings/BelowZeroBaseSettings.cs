@@ -262,6 +262,7 @@ namespace LiveSplit.BelowZero
                     SplitName.AlAnTransferDeathSplit,
                     SplitName.BraceSplit,
                     SplitName.InsertHydraulicsFluidSplit,
+                    SplitName.InsertTestOverrideModuleSplit,
                     SplitName.CureFrozenLeviathanSplit,
                 }
                 .Select(x => new ComboItem<SplitName> { Value = x, Display = x.GetDescription() })
@@ -281,6 +282,23 @@ namespace LiveSplit.BelowZero
 
         private static readonly Lazy<IReadOnlyList<ComboItem<Artifact>>> Artifacts =
             new Lazy<IReadOnlyList<ComboItem<Artifact>>>(() => BuildEnumList<Artifact>(1));
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<StoryGoal>>> StoryGoals =
+            new Lazy<IReadOnlyList<ComboItem<StoryGoal>>>(() =>
+                Enum.GetValues(typeof(StoryGoal))
+                    .Cast<StoryGoal>()
+                    .Where(value => value != StoryGoal.None
+                        && !value.ToString().StartsWith("Achievement", StringComparison.Ordinal))
+                    .Select(value => new ComboItem<StoryGoal> { Value = value, Display = value.ToString() })
+                    .ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Achievement>>> Achievements =
+            new Lazy<IReadOnlyList<ComboItem<Achievement>>>(() =>
+                Enum.GetValues(typeof(Achievement))
+                    .Cast<Achievement>()
+                    .Where(value => value != Achievement.None)
+                    .Select(value => new ComboItem<Achievement> { Value = value, Display = value.GetDescription() })
+                    .ToList());
 
         private static readonly Lazy<IReadOnlyList<ComboItem<Biome>>> Biomes =
             new Lazy<IReadOnlyList<ComboItem<Biome>>>(() => BuildEnumList<Biome>(1));
@@ -302,6 +320,12 @@ namespace LiveSplit.BelowZero
 
         private static readonly Lazy<IReadOnlyList<ComboItem<Artifact>>> ArtifactsAlpha =
             new Lazy<IReadOnlyList<ComboItem<Artifact>>>(() => Artifacts.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<StoryGoal>>> StoryGoalsAlpha =
+            new Lazy<IReadOnlyList<ComboItem<StoryGoal>>>(() => StoryGoals.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Achievement>>> AchievementsAlpha =
+            new Lazy<IReadOnlyList<ComboItem<Achievement>>>(() => Achievements.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
 
         private static readonly Lazy<IReadOnlyList<ComboItem<Biome>>> BiomesAlpha =
             new Lazy<IReadOnlyList<ComboItem<Biome>>>(() => Biomes.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
@@ -407,6 +431,12 @@ namespace LiveSplit.BelowZero
                 case BelowZeroEncyclopediaSplit artifactSetting when artifactSetting.Split is ArtifactSplit:
                     BindCombo(setting.ComboBox, alpha ? ArtifactsAlpha.Value : Artifacts.Value, setting.ComboBox.SelectedValue, alpha);
                     break;
+                case BelowZeroEncyclopediaSplit storyGoalSetting when storyGoalSetting.Split is StoryGoalSplit:
+                    BindCombo(setting.ComboBox, alpha ? StoryGoalsAlpha.Value : StoryGoals.Value, setting.ComboBox.SelectedValue, alpha);
+                    break;
+                case BelowZeroEncyclopediaSplit achievementSetting when achievementSetting.Split is AchievementSplit:
+                    BindCombo(setting.ComboBox, alpha ? AchievementsAlpha.Value : Achievements.Value, setting.ComboBox.SelectedValue, alpha);
+                    break;
                 case BelowZeroEncyclopediaSplit _:
                     BindCombo(setting.ComboBox, GetEncyclopediaEntries(alpha), setting.ComboBox.SelectedValue, alpha);
                     break;
@@ -473,6 +503,24 @@ namespace LiveSplit.BelowZero
         {
             var setting = new BelowZeroEncyclopediaSplit(new ArtifactSplit(Artifact.None, onlySplitOnce: true, isSubCondition));
             BindCombo(setting.cboEncy, Alpha.Checked ? ArtifactsAlpha.Value : Artifacts.Value, null, Alpha.Checked);
+            setting.IsSubCondition = isSubCondition;
+            setting.Split.IsSubCondition = isSubCondition;
+            AddHandlers(setting);
+            return setting;
+        }
+        public BelowZeroEncyclopediaSplit CreateStoryGoalSplit(bool isSubCondition)
+        {
+            var setting = new BelowZeroEncyclopediaSplit(new StoryGoalSplit(StoryGoal.None, onlySplitOnce: true, isSubCondition));
+            BindCombo(setting.cboEncy, Alpha.Checked ? StoryGoalsAlpha.Value : StoryGoals.Value, null, Alpha.Checked);
+            setting.IsSubCondition = isSubCondition;
+            setting.Split.IsSubCondition = isSubCondition;
+            AddHandlers(setting);
+            return setting;
+        }
+        public BelowZeroEncyclopediaSplit CreateAchievementSplit(bool isSubCondition)
+        {
+            var setting = new BelowZeroEncyclopediaSplit(new AchievementSplit(Achievement.None, onlySplitOnce: true, isSubCondition));
+            BindCombo(setting.cboEncy, Alpha.Checked ? AchievementsAlpha.Value : Achievements.Value, null, Alpha.Checked);
             setting.IsSubCondition = isSubCondition;
             setting.Split.IsSubCondition = isSubCondition;
             AddHandlers(setting);
@@ -547,6 +595,12 @@ namespace LiveSplit.BelowZero
             if (value is SplitName splitName)
                 return splitName.GetDescription();
 
+            if (value is StoryGoal storyGoal)
+                return storyGoal.ToString();
+
+            if (value is Achievement achievement)
+                return achievement.GetDescription();
+
             return Localization.GetDisplayName(value);
         }
 
@@ -583,6 +637,18 @@ namespace LiveSplit.BelowZero
                             setting = new BelowZeroEncyclopediaSplit(s) { IsLoadingGetter = () => this.IsLoading };
                             ApplyDataSources(setting, Alpha.Checked);
                             setting.ComboBox.SelectedValue = s.Artifact;
+                            break;
+
+                        case StoryGoalSplit s:
+                            setting = new BelowZeroEncyclopediaSplit(s) { IsLoadingGetter = () => this.IsLoading };
+                            ApplyDataSources(setting, Alpha.Checked);
+                            setting.ComboBox.SelectedValue = s.Goal;
+                            break;
+
+                        case AchievementSplit s:
+                            setting = new BelowZeroEncyclopediaSplit(s) { IsLoadingGetter = () => this.IsLoading };
+                            ApplyDataSources(setting, Alpha.Checked);
+                            setting.ComboBox.SelectedValue = s.Achievement;
                             break;
 
                         case EncyclopediaSplit s:

@@ -202,6 +202,8 @@ namespace LiveSplit.BelowZero
                 { SplitName.Blueprint, () => KnowsTech(((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>()) },
                 { SplitName.Encyclopedia, () => Encyclopedia.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) },
                 { SplitName.Artifact, () => Encyclopedia.Contains(((ArtifactSplit)CurrentSplitToCheck).Entry) },
+                { SplitName.StoryGoal, () => HasCompletedStoryGoal(((StoryGoalSplit)CurrentSplitToCheck).Goal) },
+                { SplitName.Achievement, () => HasEarnedAchievement(((AchievementSplit)CurrentSplitToCheck).Achievement) },
                 { SplitName.Biome, IsBiomeSubConditionMet },
             };
         }
@@ -214,6 +216,8 @@ namespace LiveSplit.BelowZero
                 { SplitName.Blueprint, () => UnlockedTech(((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>()) },
                 { SplitName.Encyclopedia, () => Encyclopedia.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) && !EncyclopediaOld.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) },
                 { SplitName.Artifact, () => Encyclopedia.Contains(((ArtifactSplit)CurrentSplitToCheck).Entry) && !EncyclopediaOld.Contains(((ArtifactSplit)CurrentSplitToCheck).Entry) },
+                { SplitName.StoryGoal, () => CompletedStoryGoal(((StoryGoalSplit)CurrentSplitToCheck).Goal) },
+                { SplitName.Achievement, () => EarnedAchievement(((AchievementSplit)CurrentSplitToCheck).Achievement) },
                 { SplitName.Biome, IsBiomeSplitTriggered },
                 { SplitName.Craft, IsCraftSplitTriggered },
                 { SplitName.Build, () => TryConsumeCompletedBuild(((BuildSplit)CurrentSplitToCheck).Craftable.ConvertTo<TechType>()) },
@@ -241,6 +245,7 @@ namespace LiveSplit.BelowZero
                 { SplitName.AlAnTransferDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.Precursor_Fabricator) },
                 { SplitName.BraceSplit, IsBraceSplitTriggered },
                 { SplitName.InsertHydraulicsFluidSplit, () => CompletedStoryGoal(StoryGoal.OnGlacialBasinBridgeItemInserted) },
+                { SplitName.InsertTestOverrideModuleSplit, () => CompletedStoryGoal(StoryGoal.RadioTowerTOMConnected) },
                 { SplitName.CureFrozenLeviathanSplit, () => CompletedStoryGoal(StoryGoal.OnFrozenCreatureAntidoteInserted) },
             };
         }
@@ -904,6 +909,26 @@ namespace LiveSplit.BelowZero
         {
             return goal != StoryGoal.None
                 && newlyCompletedStoryGoals.Contains(goal.ToString());
+        }
+
+        private bool HasCompletedStoryGoal(StoryGoal goal)
+        {
+            return storyGoalsInitialized
+                && goal != StoryGoal.None
+                && completedStoryGoals.Contains(goal.ToString());
+        }
+
+        private bool EarnedAchievement(Achievement achievement)
+        {
+            return achievement != Achievement.None
+                && newlyCompletedStoryGoals.Contains(achievement.ToString());
+        }
+
+        private bool HasEarnedAchievement(Achievement achievement)
+        {
+            return storyGoalsInitialized
+                && achievement != Achievement.None
+                && completedStoryGoals.Contains(achievement.ToString());
         }
 
         public bool IntroCompleted()

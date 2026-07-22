@@ -146,6 +146,12 @@ namespace LiveSplit.BelowZero
                 case ArtifactSplit artifactSplit:
                     xmlValue.InnerText = artifactSplit.Artifact.ToString();
                     break;
+                case StoryGoalSplit storyGoalSplit:
+                    xmlValue.InnerText = storyGoalSplit.Goal.ToString();
+                    break;
+                case AchievementSplit achievementSplit:
+                    xmlValue.InnerText = achievementSplit.Achievement.ToString();
+                    break;
                 case ItemSplit itemSplit:
                     xmlValue.InnerText = $"{itemSplit.Item}:{itemSplit.PickUp}:{itemSplit.IsCount}:{itemSplit.Count}";
                     break;
@@ -264,6 +270,21 @@ namespace LiveSplit.BelowZero
                     if (!Enum.TryParse(value, ignoreCase: true, out Artifact artifact))
                         return null;
                     split = new ArtifactSplit(artifact, onlySplitOnce, isSubCondition);
+                    break;
+
+                case SplitName.StoryGoal:
+                    if (!Enum.TryParse(value, ignoreCase: true, out StoryGoal storyGoal)
+                        || storyGoal == StoryGoal.None
+                        || storyGoal.ToString().StartsWith("Achievement", StringComparison.Ordinal))
+                        return null;
+                    split = new StoryGoalSplit(storyGoal, onlySplitOnce, isSubCondition);
+                    break;
+
+                case SplitName.Achievement:
+                    if (!Enum.TryParse(value, ignoreCase: true, out Achievement achievement)
+                        || achievement == Achievement.None)
+                        return null;
+                    split = new AchievementSplit(achievement, onlySplitOnce, isSubCondition);
                     break;
 
                 case SplitName.Biome:

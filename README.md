@@ -7,7 +7,7 @@ This LiveSplit Auto Splitter provides automatic start, split, and reset support 
 - Conditional Auto Splits
 - Automatic reset on returning to the main menu
 - Ordered split handling for LiveSplit order or auto-split order
-- Prefabricated split support for common Below Zero route events
+- Pre-Made Conditions split support for common Below Zero route events
 - Enter Base and Exit Base splits
 - Blueprint, story goal, inventory, biome, build, and artifact tracking
 
@@ -38,7 +38,7 @@ Other versions may partially work as well. When an exact version is not matched,
 
 ## Auto Splits
 Auto splits can have additional conditions, such as being in a specific biome while crafting a specific item.
-Some auto splits are further configurable, including Inventory, Blueprint, Biome, Build, Encyclopedia, and Artifact splits.
+Some auto splits are further configurable, including Inventory, Blueprint, Biome, Build, Encyclopedia, Artifact, Story Goal, and Achievement splits. Story Goals use their raw internal names, while Achievements use their official display names.
 
 ## Generate Splits
 This button generates LiveSplit splits based on the Auto Splits you have configured

@@ -78,7 +78,7 @@ namespace LiveSplit.BelowZero
             this.l_name.Name = "l_name";
             this.l_name.Size = new System.Drawing.Size(70, 13);
             this.l_name.TabIndex = 17;
-            this.l_name.Text = "Prefabricated";
+            this.l_name.Text = "Pre-Made Conditions";
             // 
             // picHandle
             // 

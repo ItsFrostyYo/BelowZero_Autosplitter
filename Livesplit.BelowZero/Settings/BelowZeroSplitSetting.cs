@@ -119,6 +119,10 @@ namespace LiveSplit.BelowZero
         Encyclopedia,
         [Description("Artifacts"), ToolTip("Splits when you scan a certain Architect Artifact")]
         Artifact,
+        [Description("Story Goal"), ToolTip("Splits when a certain story goal is completed")]
+        StoryGoal,
+        [Description("Achievement"), ToolTip("Splits when a certain achievement goal is completed")]
+        Achievement,
         [Description("Biome"), ToolTip("Splits when you enter a biome or move between biomes")]
         Biome,
         [Description("Craft"), ToolTip("Splits when you start crafting a certain item")]
@@ -173,8 +177,8 @@ namespace LiveSplit.BelowZero
         BraceSplit,
         [Description("Insert Hydraulics Fluid"), ToolTip("Splits when you Insert Hydraulics Fluid into the Bridge Controls in the Glacial Bay")]
         InsertHydraulicsFluidSplit,
-        //[Description("Insert Test Overide Module"), ToolTip("Splits when you Insert the Test Override Module into the Radio Tower")]
-        //InsertTestOverrideModuleSplit,
+        [Description("Insert Test Override Module"), ToolTip("Splits when you Insert the Test Override Module into the Radio Tower")]
+        InsertTestOverrideModuleSplit,
         [Description("Cure Frozen Leviathan"), ToolTip("Splits when you Insert the Antidote into the Machine inside the Frozen Leviathan Cave to Cure")]
         CureFrozenLeviathanSplit,
     }

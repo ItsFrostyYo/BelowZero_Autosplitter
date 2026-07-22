@@ -57,7 +57,7 @@ namespace LiveSplit.BelowZero
             this.PrefabSplitOptions_GroupBox.Size = new System.Drawing.Size(466, 135);
             this.PrefabSplitOptions_GroupBox.TabIndex = 6;
             this.PrefabSplitOptions_GroupBox.TabStop = false;
-            this.PrefabSplitOptions_GroupBox.Text = "Prefabricated Split";
+            this.PrefabSplitOptions_GroupBox.Text = "Pre-Made Conditions Split";
             // 
             // Other_GroupBox
             // 
@@ -98,7 +98,7 @@ namespace LiveSplit.BelowZero
             this.PrefabSplit_GroupBox.Size = new System.Drawing.Size(162, 81);
             this.PrefabSplit_GroupBox.TabIndex = 7;
             this.PrefabSplit_GroupBox.TabStop = false;
-            this.PrefabSplit_GroupBox.Text = "Prefabricated Split";
+            this.PrefabSplit_GroupBox.Text = "Pre-Made Conditions Split";
             // 
             // SortBy_GroupBox
             // 
