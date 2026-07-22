@@ -64,5 +64,10 @@ namespace LiveSplit.BelowZero
         crystalcave_vent,
         lilypads_shipwreck,
         purplevents_shipwreck,
+        twistyBridges_Deep,
+        ArcticSpiresCache,
+        lilyPads_Deep_Cache,
+        CrystalCave_Cache,
+        Precursor_Fabricator,
     }
 }

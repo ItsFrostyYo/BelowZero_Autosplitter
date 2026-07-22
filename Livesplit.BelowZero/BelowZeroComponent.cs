@@ -71,7 +71,7 @@ namespace LiveSplit.BelowZero
         private bool MarkStarted(string reason)
         {
             logger.Log(reason);
-            memory.ClearHeldMovementStartAfterReset();
+            memory.MovementStartArmed = false;
             memory.startedTimerBefore = true;
             return true;
         }
@@ -103,7 +103,7 @@ namespace LiveSplit.BelowZero
             return (PDATab)memory.PDATab.New == PDATab.Intro;
         }
 
-        private bool HasValidPDAStart()
+        private bool PDAStartTriggered()
         {
             if (!memory.PDATab.Changed)
                 return false;
@@ -133,25 +133,25 @@ namespace LiveSplit.BelowZero
             if (!(memory.PlayerControllerInputEnabled?.New ?? false))
                 return false;
 
-            if (memory.HasHeldMovementStartArmedAfterReset()
+            if (memory.MovementStartArmed
                 && !IsAutomaticIntroUiStateActive()
-                && memory.HasActiveMovementInput(0.001f))
+                && memory.IsMovementInputActive(0.001f))
             {
                 return MarkStarted($"{context}: Start of Move (held after reset)");
             }
 
-            if (memory.HasMovementStartThisFrame(0.35f, 0.001f))
+            if (memory.MovementStarted(0.35f, 0.001f))
             {
                 return MarkStarted($"{context}: Start of Move");
             }
 
-            bool becameStartEligibleThisFrame =
+            bool becameStartEligible =
                 (memory.IsLoadingScreenShowing.Changed && !memory.IsLoadingScreenShowing.New)
                 || (memory.PlayerControllerInputEnabled.Changed && memory.PlayerControllerInputEnabled.New);
 
-            if (becameStartEligibleThisFrame &&
-                (memory.HasActiveHorizontalVelocity(0.35f)
-                 || memory.HasActiveMovementInput(0.001f)))
+            if (becameStartEligible &&
+                (memory.IsMovingHorizontally(0.35f)
+                 || memory.IsMovementInputActive(0.001f)))
             {
                 return MarkStarted($"{context}: Start of Move (held input)");
             }
@@ -161,12 +161,12 @@ namespace LiveSplit.BelowZero
                 return MarkStarted($"{context}: Start of Jump");
             }
 
-            if (memory.HasBuilderMenuStartThisFrame())
+            if (memory.BuilderMenuOpened())
             {
                 return MarkStarted($"{context}: Start of Builder Menu");
             }
 
-            if (memory.HasSnowballPickupStartThisFrame())
+            if (memory.PickedUpSnowball())
             {
                 return MarkStarted($"{context}: Start of Snowball Pickup");
             }
@@ -178,7 +178,7 @@ namespace LiveSplit.BelowZero
                 return MarkStarted($"{context}: Start of Crafting Menu");
             }
 
-            if (HasValidPDAStart())
+            if (PDAStartTriggered())
             {
                 return MarkStarted($"{context}: Start of PDA");
             }

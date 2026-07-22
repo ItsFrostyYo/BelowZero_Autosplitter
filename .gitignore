@@ -10,6 +10,7 @@ Components/*.xml
 !Components/BelowZero.Updates.xml
 
 _work/
+LocalPaths.md
 docs/
 _scratch_*.cs
 tmp_compare_versions.py

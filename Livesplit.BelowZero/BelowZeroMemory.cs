@@ -36,7 +36,6 @@ namespace LiveSplit.BelowZero
         private const int maxBuilderMenuSelectionWindowMs = 3000;
         private const int minThrowSplitCooldownMs = 250;
         private const int maxAcquireAlAnInteractionWindowMs = 5000;
-        private const int acquireAlAnDestroyBurstWindowMs = 750;
         private const int maxBraceInteractionWindowMs = 120000;
         private static readonly Regex BuildTimeYearRegex = new Regex(@"(?<!\d)(20\d{2})(?!\d)", RegexOptions.Compiled);
         public readonly Dictionary<SplitName, Func<bool>> splitConditions;
@@ -48,17 +47,15 @@ namespace LiveSplit.BelowZero
         private readonly Stopwatch throwSplitCooldown = new Stopwatch();
         private readonly Stopwatch builderMenuSelectionWindow = new Stopwatch();
         private readonly Stopwatch acquireAlAnInteractionWindow = new Stopwatch();
-        private readonly Stopwatch acquireAlAnDestroyBurstWindow = new Stopwatch();
         private readonly Stopwatch braceInteractionWindow = new Stopwatch();
         private TechType lastThrowSplitTool = TechType.None;
-        private TechType startedCraftThisFrame = TechType.None;
-        private TechType completedCraftFallbackThisFrame = TechType.None;
-        private TechType completedBuildThisFrame = TechType.None;
+        private TechType startedCraft = TechType.None;
+        private TechType fallbackCompletedCraft = TechType.None;
+        private TechType completedBuild = TechType.None;
         private TechType pendingBuilderCompletionTechType = TechType.None;
         private IntPtr trackedHoverpadConstructorPtr = IntPtr.Zero;
         private bool hasUnityObjectCachedPtrOffset = true;
         private bool builderMenuSelectionPending;
-        private bool bridgeInsertThisFrame;
         private bool braceReadyForCinematic;
         private bool craftAnalyticsInitialized;
         private bool hoverpadConstructingInitialized;
@@ -68,10 +65,9 @@ namespace LiveSplit.BelowZero
         private bool blueprintsInitialized;
         private bool encyclopediaInitialized;
         private bool storyGoalsInitialized;
-        private string storyGoalReaderMode = string.Empty;
         private StoryGoal acquireAlAnTargetGoal = StoryGoal.None;
         private StoryGoal acquireAlAnArmedGoal = StoryGoal.None;
-        private bool heldMovementStartArmedAfterReset;
+        public bool MovementStartArmed { get; set; }
         private int playerInventorySlotsUsed;
         private int playerInventorySlotsUsedOld;
         private int unityObjectCachedPtrOffset = 0x10;
@@ -83,17 +79,15 @@ namespace LiveSplit.BelowZero
         public Pointer<bool> IsAnimationPlaying;
         public Pointer<bool> IsLoadingScreenShowing;
         public Pointer<bool> IsPlayerJumping;
-        public Pointer<bool> IsDying;
+        public Pointer<bool> DeathScreenActive;
         public Pointer<bool> PlayerControllerInputEnabled;
         public Pointer<float> PlayerControllerVelocityX;
-        public Pointer<float> PlayerControllerVelocityY;
         public Pointer<float> PlayerControllerVelocityZ;
         public Pointer<float> Health;
         public Pointer<float> MoveDirectionX;
         public Pointer<float> MoveDirectionZ;
         public Pointer<bool> BuilderMenuState;
         public Pointer<int> BuilderLastTechType;
-        public Pointer<IntPtr> ActiveCrafterLogic;
         public Pointer<bool> PlayerIsUnderwater;
         public Pointer<bool> PlayerIsInside;
         public Pointer<IntPtr> MainMenu;
@@ -128,9 +122,8 @@ namespace LiveSplit.BelowZero
         public List<TechType> KnownTechOld = new List<TechType>();
         public List<EncyclopediaEntry> Encyclopedia = new List<EncyclopediaEntry>();
         public List<EncyclopediaEntry> EncyclopediaOld = new List<EncyclopediaEntry>();
-        private HashSet<StoryGoal> completedStoryGoals = new HashSet<StoryGoal>();
-        private HashSet<StoryGoal> completedStoryGoalsOld = new HashSet<StoryGoal>();
-        private HashSet<StoryGoal> storyGoalsCompletedThisFrame = new HashSet<StoryGoal>();
+        private HashSet<string> completedStoryGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private HashSet<string> newlyCompletedStoryGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<TechType, int> craftCounts = new Dictionary<TechType, int>();
         private readonly HashSet<TechType> suppressCraftCompletionFallback = new HashSet<TechType>();
 
@@ -138,7 +131,6 @@ namespace LiveSplit.BelowZero
         private IntPtr equipmentKlass;
         private IntPtr icKlass;
         private IntPtr invStaticKlass;
-        private IntPtr itemGroupKlass;
 
         private int invStaticOffset;
         private int off_container;
@@ -154,6 +146,7 @@ namespace LiveSplit.BelowZero
         private int dict_off_entries;
         private int dict_off_version;
         private int hashset_off_slots;
+        private int hashset_off_count;
         private int hashset_off_version;
         private int arr_off_len;
         private int arr_data_base;
@@ -164,10 +157,6 @@ namespace LiveSplit.BelowZero
         private int off_storyHandTargetSecondaryTooltip;
         private int off_storyHandTargetGoal;
         private int off_storyGoalKey;
-        private int off_array3SizeX = 0x10;
-        private int off_array3SizeY = 0x14;
-        private int off_array3SizeZ = 0x18;
-        private int off_array3Data = 0x20;
         private MethodInfo helperClassNameMethod;
         private MethodInfo helperClassNamespaceMethod;
 
@@ -231,7 +220,7 @@ namespace LiveSplit.BelowZero
             return new Dictionary<SplitName, Func<bool>>
             {
                 { SplitName.Inventory, IsInventorySubConditionMet },
-                { SplitName.Blueprint, () => KnownTech.Contains(((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>()) },
+                { SplitName.Blueprint, () => KnowsTech(((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>()) },
                 { SplitName.Encyclopedia, () => Encyclopedia.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) },
                 { SplitName.Biome, IsBiomeSubConditionMet },
             };
@@ -242,33 +231,33 @@ namespace LiveSplit.BelowZero
             return new Dictionary<SplitName, Func<bool>>
             {
                 { SplitName.Inventory, IsInventorySplitTriggered },
-                { SplitName.Blueprint, IsBlueprintSplitTriggered },
-                { SplitName.Encyclopedia, IsEncyclopediaSplitTriggered },
+                { SplitName.Blueprint, () => UnlockedTech(((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>()) },
+                { SplitName.Encyclopedia, () => Encyclopedia.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) && !EncyclopediaOld.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) },
                 { SplitName.Biome, IsBiomeSplitTriggered },
                 { SplitName.Craft, IsCraftSplitTriggered },
                 { SplitName.Build, () => TryConsumeCompletedBuild(((BuildSplit)CurrentSplitToCheck).Craftable.ConvertTo<TechType>()) },
                 { SplitName.FullInventorySplit, () => playerInventorySlotsUsed == inventoryCapacitySlots && playerInventorySlotsUsedOld != inventoryCapacitySlots },
-                { SplitName.DeathSplit, IsDeathThisFrame },
-                { SplitName.ThrowFlareSplit, () => TryConsumeThrownInventoryItem(TechType.Flare, "Flare") },
-                { SplitName.ThrowSnowballSplit, () => TryConsumeThrownInventoryItem(TechType.SnowBall, "Snowball") },
-                { SplitName.PropulsionCannonDrownSplit, () => IsDeathThisFrame() && new[] { "ArcticKelp_CaveInner", "ArcticKelp_CaveOuter" }.Contains(BiomeString.New, StringComparer.OrdinalIgnoreCase) && HasKnownTech(TechType.PropulsionCannon, TechType.PropulsionCannonBlueprint) },
-                { SplitName.TwistyBridgesDeathSplit, () => IsDeathThisFrame() && new[] { "TwistyBridges", "twistyBridges_Deep" }.Contains(BiomeString.New, StringComparer.OrdinalIgnoreCase) },
-                { SplitName.AcquireAlAnSplit, TryConsumeAcquireAlAn },
-                { SplitName.BoosterTankDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "purpleVents", StringComparison.OrdinalIgnoreCase) && HasKnownTech(TechType.SuitBoosterTank) },
-                { SplitName.ArcticSpiresScanSplit, () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCTissue) },
-                { SplitName.ArcticSpiresDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "ArcticSpiresCache", StringComparison.OrdinalIgnoreCase) },
-                { SplitName.ArcticSpiresTransitionSplit, () => HasPlayableBiomeTransitionFrom("ArcticSpiresCache") },
-                { SplitName.DeepLilypadsCacheScanSplit, () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCSkeleton) },
-                { SplitName.DeepLilypadCacheDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "lilyPads_Deep_Cache", StringComparison.OrdinalIgnoreCase) },
-                { SplitName.DeepLilypadsCacheTransitionSplit, () => HasPlayableBiomeTransitionFrom("lilyPads_Deep_Cache") },
-                { SplitName.CrystalCavesCacheScanSplit, () => HasKnownTechUnlockedThisFrame(TechType.PrecursorNPCOrgans) },
-                { SplitName.CrystalCavesCacheDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "CrystalCave_Cache", StringComparison.OrdinalIgnoreCase) },
-                { SplitName.CrystalCavesCacheTransitionSplit, () => HasPlayableBiomeTransitionFrom("CrystalCave_Cache") },
-                { SplitName.CommenceStorageMediumFabricationSplit, () => TryConsumeStartedCraft(TechType.PrecursorNPCBody) || HasStoryGoalCompletedThisFrame(StoryGoal.Log_Alan_BodyBuilt) },
-                { SplitName.AlAnTransferSplit, () => HasTransferStartedThisFrame() || HasStoryGoalCompletedThisFrame(StoryGoal.OnPrecursorNPCTransfer) },
-                { SplitName.AlAnTransferDeathSplit, () => IsDeathThisFrame() && string.Equals(BiomeString.New, "Precursor_Fabricator", StringComparison.OrdinalIgnoreCase) },
-                { SplitName.BraceSplit, TryConsumeBrace },
-                { SplitName.InsertHydraulicsFluidSplit, TryConsumeBridgeInsert },
+                { SplitName.DeathSplit, PlayerDied },
+                { SplitName.ThrowFlareSplit, () => InventoryItemRemovedOutsidePDA(TechType.Flare, "Flare") },
+                { SplitName.ThrowSnowballSplit, () => InventoryItemRemovedOutsidePDA(TechType.SnowBall, "Snowball") },
+                { SplitName.PropulsionCannonDrownSplit, () => PlayerDied() && IsInsideBiomes(Biome.arctickelp_caveinner, Biome.arctickelp_caveouter) && KnowsTech(TechType.PropulsionCannon, TechType.PropulsionCannonBlueprint) },
+                { SplitName.TwistyBridgesDeathSplit, () => PlayerDied() && IsInsideBiomes(Biome.twistyBridges, Biome.twistyBridges_Deep) },
+                { SplitName.AcquireAlAnSplit, IsAcquireAlAnSplitTriggered },
+                { SplitName.BoosterTankDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.purpleVents) && KnowsTech(TechType.SuitBoosterTank) },
+                { SplitName.ArcticSpiresScanSplit, () => UnlockedTech(TechType.PrecursorNPCTissue) },
+                { SplitName.ArcticSpiresDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.ArcticSpiresCache) },
+                { SplitName.ArcticSpiresTransitionSplit, () => TransitionedFromBiome(Biome.ArcticSpiresCache) },
+                { SplitName.DeepLilypadsCacheScanSplit, () => UnlockedTech(TechType.PrecursorNPCSkeleton) },
+                { SplitName.DeepLilypadCacheDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.lilyPads_Deep_Cache) },
+                { SplitName.DeepLilypadsCacheTransitionSplit, () => TransitionedFromBiome(Biome.lilyPads_Deep_Cache) },
+                { SplitName.CrystalCavesCacheScanSplit, () => UnlockedTech(TechType.PrecursorNPCOrgans) },
+                { SplitName.CrystalCavesCacheDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.CrystalCave_Cache) },
+                { SplitName.CrystalCavesCacheTransitionSplit, () => TransitionedFromBiome(Biome.CrystalCave_Cache) },
+                { SplitName.CommenceStorageMediumFabricationSplit, () => TryConsumeStartedCraft(TechType.PrecursorNPCBody) || CompletedStoryGoal(StoryGoal.Log_Alan_BodyBuilt) },
+                { SplitName.AlAnTransferSplit, () => (PrecursorTransferActive != null && PrecursorTransferActive.Changed && PrecursorTransferActive.New) || CompletedStoryGoal(StoryGoal.OnPrecursorNPCTransfer) },
+                { SplitName.AlAnTransferDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.Precursor_Fabricator) },
+                { SplitName.BraceSplit, IsBraceSplitTriggered },
+                { SplitName.InsertHydraulicsFluidSplit, () => InventoryItemRemovedOutsidePDA(TechType.HydraulicFluid, "Hydraulic Fluid") },
             };
         }
 
@@ -282,8 +271,7 @@ namespace LiveSplit.BelowZero
         private bool IsBiomeSubConditionMet()
         {
             BiomeSplit split = (BiomeSplit)CurrentSplitToCheck;
-            return split.Biomes.Biome1 == Biome.Any
-                || string.Equals(BiomeString.New, split.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase);
+            return split.Biomes.Biome1 == Biome.Any || IsInsideBiome(split.Biomes.Biome1);
         }
 
         private bool IsInventorySplitTriggered()
@@ -308,26 +296,13 @@ namespace LiveSplit.BelowZero
             return shouldSplit;
         }
 
-        private bool IsBlueprintSplitTriggered()
-        {
-            TechType techType = ((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>();
-            return KnownTech.Contains(techType) && !KnownTechOld.Contains(techType);
-        }
-
-        private bool IsEncyclopediaSplitTriggered()
-        {
-            EncyclopediaEntry entry = ((EncyclopediaSplit)CurrentSplitToCheck).Entry;
-            return Encyclopedia.Contains(entry) && !EncyclopediaOld.Contains(entry);
-        }
-
         private bool IsBiomeSplitTriggered()
         {
             BiomeSplit split = (BiomeSplit)CurrentSplitToCheck;
             return (split.Biomes.Biome1 == Biome.Any && split.Biomes.Biome2 == Biome.Any && BiomeString.Changed)
-                || (split.Biomes.Biome1 == Biome.Any && string.Equals(BiomeString.New, split.Biomes.Biome2.ToString(), StringComparison.OrdinalIgnoreCase) && BiomeString.Changed)
-                || (split.Biomes.Biome2 == Biome.Any && string.Equals(BiomeString.Old, split.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase) && BiomeString.Changed)
-                || (string.Equals(BiomeString.New, split.Biomes.Biome2.ToString(), StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(BiomeString.Old, split.Biomes.Biome1.ToString(), StringComparison.OrdinalIgnoreCase));
+                || (split.Biomes.Biome1 == Biome.Any && IsInsideBiome(split.Biomes.Biome2) && BiomeString.Changed)
+                || (split.Biomes.Biome2 == Biome.Any && WasInsideBiome(split.Biomes.Biome1) && BiomeString.Changed)
+                || TransitionedBetweenBiomes(split.Biomes.Biome1, split.Biomes.Biome2);
         }
 
         private bool IsCraftSplitTriggered()
@@ -381,17 +356,24 @@ namespace LiveSplit.BelowZero
                 SplitName.CrystalCavesCacheScanSplit))
                 UpdateBlueprints();
 
+            if (Needs(
+                SplitName.DeathSplit,
+                SplitName.PropulsionCannonDrownSplit,
+                SplitName.TwistyBridgesDeathSplit,
+                SplitName.BoosterTankDeathSplit,
+                SplitName.ArcticSpiresDeathSplit,
+                SplitName.DeepLilypadCacheDeathSplit,
+                SplitName.CrystalCavesCacheDeathSplit,
+                SplitName.AlAnTransferDeathSplit))
+            {
+                Health.ForceUpdate();
+                DeathScreenActive.ForceUpdate();
+            }
+
             if (Needs(SplitName.Encyclopedia))
                 UpdateEncyclopedia();
 
-            if (Needs(
-                SplitName.AcquireAlAnSplit,
-                SplitName.CommenceStorageMediumFabricationSplit,
-                SplitName.AlAnTransferSplit,
-                SplitName.BraceSplit))
-            {
-                UpdateCompletedStoryGoals();
-            }
+            UpdateStoryGoals();
 
             if (Needs(SplitName.Craft, SplitName.AcquireAlAnSplit))
                 CaptureTrackedInteractiveTargets();
@@ -399,8 +381,6 @@ namespace LiveSplit.BelowZero
             if (Needs(SplitName.Craft, SplitName.Build, SplitName.CommenceStorageMediumFabricationSplit))
                 UpdateCraftAndBuildState();
 
-            if (Needs(SplitName.InsertHydraulicsFluidSplit))
-                UpdateBridgeInteractiveState();
         }
 
         private void GetGameVersion()
@@ -640,7 +620,7 @@ namespace LiveSplit.BelowZero
             off_equippedCount = unity.ResolveFieldOffsetByNameOrPredicate(equipmentKlass, new[] { "equippedCount" }, name => UnityHelperTask.UnityNameUtil.NameHas(name, "equippedCount"));
             off_itemsDict = unity.ResolveFieldOffsetByNameOrPredicate(icKlass, new[] { "_items" }, name => UnityHelperTask.UnityNameUtil.NameHas(name, "items"));
 
-            itemGroupKlass = mono.FindClass("ItemGroup", mono.MainImage);
+            IntPtr itemGroupKlass = mono.FindClass("ItemGroup", mono.MainImage);
             off_itemGroup_items = unity.ResolveFieldOffsetByNameOrPredicate(itemGroupKlass, new[] { "items" }, name => UnityHelperTask.UnityNameUtil.NameHas(name, "items"));
             off_itemGroup_id = unity.ResolveFieldOffsetByNameOrPredicate(itemGroupKlass, new[] { "id", "techType" }, name =>
             {
@@ -697,6 +677,7 @@ namespace LiveSplit.BelowZero
 
                 IntPtr hashSetKlass = unity.TryFindClassOnce("HashSet`1", core);
                 hashset_off_slots = 0x18;
+                hashset_off_count = 0x20;
                 hashset_off_version = 0x28;
                 if (hashSetKlass != IntPtr.Zero)
                 {
@@ -706,6 +687,13 @@ namespace LiveSplit.BelowZero
                         name => UnityHelperTask.UnityNameUtil.NameHas(name, "slots"));
                     if (slotsOffset != 0)
                         hashset_off_slots = slotsOffset;
+
+                    int countOffset = unity.ResolveFieldOffsetByNameOrPredicate(
+                        hashSetKlass,
+                        new[] { "_count", "m_count", "count" },
+                        name => UnityHelperTask.UnityNameUtil.NameHas(name, "count"));
+                    if (countOffset != 0)
+                        hashset_off_count = countOffset;
 
                     int versionOffset = unity.ResolveFieldOffsetByNameOrPredicate(
                         hashSetKlass,
@@ -717,7 +705,7 @@ namespace LiveSplit.BelowZero
 
             }
 
-            knownTechPtr = ptrFactory.Make<IntPtr>("Player", "main", "knownTech");
+            knownTechPtr = ptrFactory.Make<IntPtr>("KnownTech", "knownTech");
             encyclopediaPtr = ptrFactory.Make<IntPtr>("Player", "main", "encyclopedia");
 
             IntPtr storyGoalManagerKlass = mono.FindClass("StoryGoalManager", mono.MainImage);
@@ -771,28 +759,8 @@ namespace LiveSplit.BelowZero
 
             int off_client = mono.GetFieldOffset(mono.FindClass("uGUI_CraftingMenu"), "_client");
             CraftingMenu = ptrFactory.Make<IntPtr>(craftingMenuRootPtr, off_client);
-            int off_crafterLogic = mono.GetFieldOffset(mono.FindClass("Crafter"), "crafterLogic");
-            ActiveCrafterLogic = ptrFactory.Make<IntPtr>(CraftingMenu, off_crafterLogic);
-
             MoveDirectionX = ptrFactory.Make<float>("GameInput", "moveDirection", 0x0);
             MoveDirectionZ = ptrFactory.Make<float>("GameInput", "moveDirection", 0x8);
-
-            IntPtr array3Klass = unity.TryFindClassOnce("Array3`1", mono.MainImage);
-            if (array3Klass != IntPtr.Zero)
-            {
-                int candSizeX = mono.GetFieldOffset(array3Klass, "sizeX");
-                int candSizeY = mono.GetFieldOffset(array3Klass, "sizeY");
-                int candSizeZ = mono.GetFieldOffset(array3Klass, "sizeZ");
-                int candData = mono.GetFieldOffset(array3Klass, "data");
-                if (candSizeX != 0)
-                    off_array3SizeX = candSizeX;
-                if (candSizeY != 0)
-                    off_array3SizeY = candSizeY;
-                if (candSizeZ != 0)
-                    off_array3SizeZ = candSizeZ;
-                if (candData != 0)
-                    off_array3Data = candData;
-            }
 
             Pointer<IntPtr> groundMotorPtr = ptrFactory.Make<IntPtr>("Player", "main", "groundMotor");
             int off_jumpState = mono.GetFieldOffset(mono.FindClass("GroundMotor"), "jumping");
@@ -800,7 +768,7 @@ namespace LiveSplit.BelowZero
             logger.Log("Jump state flag offset fixed at 0x24.");
             IsPlayerJumping = ptrFactory.Make<bool>(jumpingStatePtr, 0x24);
 
-            IsDying = ptrFactory.Make<bool>("uGUI_PlayerDeath", "main", "active");
+            DeathScreenActive = ptrFactory.Make<bool>("uGUI_PlayerDeath", "main", "active");
             PrecursorTransferActive = ptrFactory.Make<bool>("PrecursorFabricatorController", "isTransferActive");
 
             Pointer<IntPtr> quickSlotsPtr = ptrFactory.Make<IntPtr>("Inventory", "main", "<quickSlots>k__BackingField");
@@ -832,7 +800,6 @@ namespace LiveSplit.BelowZero
             Pointer<IntPtr> playerControllerPtr = ptrFactory.Make<IntPtr>("Player", "main", "<playerController>k__BackingField");
             int off_velocity = mono.GetFieldOffset(mono.FindClass("PlayerController"), "velocity");
             PlayerControllerVelocityX = ptrFactory.Make<float>(playerControllerPtr, off_velocity + 0x0);
-            PlayerControllerVelocityY = ptrFactory.Make<float>(playerControllerPtr, off_velocity + 0x4);
             PlayerControllerVelocityZ = ptrFactory.Make<float>(playerControllerPtr, off_velocity + 0x8);
             int off_inputEnabled = mono.GetFieldOffset(mono.FindClass("PlayerController"), "inputEnabled");
             PlayerControllerInputEnabled = ptrFactory.Make<bool>(playerControllerPtr, off_inputEnabled);
@@ -924,39 +891,13 @@ namespace LiveSplit.BelowZero
             return IsMainMenuPosition(PlayerLastPositionX?.New ?? float.NaN, PlayerLastPositionY?.New ?? float.NaN, PlayerLastPositionZ?.New ?? float.NaN);
         }
 
-        private bool IsWithinBounds(float[] bounds, bool old = false)
-        {
-            if (bounds == null || bounds.Length < 6 || !TryGetPlayerPosition(old, out float x, out float y, out float z))
-                return false;
-
-            return x >= Math.Min(bounds[0], bounds[1]) && x <= Math.Max(bounds[0], bounds[1])
-                && y >= Math.Min(bounds[2], bounds[3]) && y <= Math.Max(bounds[2], bounds[3])
-                && z >= Math.Min(bounds[4], bounds[5]) && z <= Math.Max(bounds[4], bounds[5]);
-        }
-
-        private bool TryGetPlayerPosition(bool old, out float x, out float y, out float z)
-        {
-            if (directPositionPointersBound && TryReadPosition(DirectPositionX, DirectPositionY, DirectPositionZ, old, out x, out y, out z))
-                return true;
-
-            return TryReadPosition(PlayerLastPositionX, PlayerLastPositionY, PlayerLastPositionZ, old, out x, out y, out z);
-        }
-
-        private static bool TryReadPosition(Pointer<float> xPointer, Pointer<float> yPointer, Pointer<float> zPointer, bool old, out float x, out float y, out float z)
-        {
-            x = old ? xPointer?.Old ?? float.NaN : xPointer?.New ?? float.NaN;
-            y = old ? yPointer?.Old ?? float.NaN : yPointer?.New ?? float.NaN;
-            z = old ? zPointer?.Old ?? float.NaN : zPointer?.New ?? float.NaN;
-            return !float.IsNaN(x) && !float.IsInfinity(x)
-                && !float.IsNaN(y) && !float.IsInfinity(y)
-                && !float.IsNaN(z) && !float.IsInfinity(z);
-        }
-
         public bool ShouldPause() => false;
 
         private void UpdateBlueprints()
         {
-            List<TechType> currentKnownTech = ReadTechTypeList(knownTechPtr.New);
+            if (!TryReadKnownTech(out List<TechType> currentKnownTech))
+                return;
+
             if (!blueprintsInitialized)
             {
                 KnownTech = currentKnownTech;
@@ -969,29 +910,37 @@ namespace LiveSplit.BelowZero
             KnownTech = currentKnownTech;
         }
 
-        private List<TechType> ReadTechTypeList(IntPtr listPtr)
+        private bool TryReadKnownTech(out List<TechType> result)
         {
-            var result = new List<TechType>();
-            if (listPtr == IntPtr.Zero)
-                return result;
+            result = new List<TechType>();
+            IntPtr hashSetPtr = knownTechPtr?.New ?? IntPtr.Zero;
+            if (hashSetPtr == IntPtr.Zero || hashset_off_slots == 0)
+                return false;
 
-            IntPtr itemsArr = game.Read<IntPtr>(listPtr + off_list_items);
-            if (itemsArr == IntPtr.Zero)
-                return result;
+            IntPtr slotsArr = game.Read<IntPtr>(hashSetPtr + hashset_off_slots);
+            if (slotsArr == IntPtr.Zero)
+                return false;
 
-            int count = game.Read<int>(listPtr + off_list_size);
-            if ((uint)count > 100000)
-                return result;
+            int length = game.Read<int>(slotsArr + arr_off_len);
+            if (length <= 0 || length > 100000)
+                return false;
 
-            IntPtr basePtr = itemsArr + arr_data_base;
-            for (int i = 0; i < count; i++)
+            const int slotStride = 0x0C;
+            const int slotValueOffset = 0x08;
+            IntPtr basePtr = slotsArr + arr_data_base;
+            for (int i = 0; i < length; i++)
             {
-                int tech = game.Read<int>(basePtr + i * 4);
-                if (tech > 0)
+                IntPtr slot = basePtr + i * slotStride;
+                int hashCode = game.Read<int>(slot);
+                if (hashCode < 0)
+                    continue;
+
+                int tech = game.Read<int>(slot + slotValueOffset);
+                if (tech > 0 && tech <= (int)TechType.BaseMoonpoolExpansion)
                     result.Add((TechType)tech);
             }
 
-            return result;
+            return result.Count > 0;
         }
 
         private void UpdateInventory()
@@ -1079,37 +1028,23 @@ namespace LiveSplit.BelowZero
             }
         }
 
-        public bool HasInventoryChangesThisFrame() => currentInventoryChanges.Count > 0;
-
-        public bool HasHeldMovementStartArmedAfterReset() => heldMovementStartArmedAfterReset;
-
-        public void ClearHeldMovementStartAfterReset() => heldMovementStartArmedAfterReset = false;
-
-        public bool HasMovementStartThisFrame(float velocityThreshold = 0.35f, float inputThreshold = 0.001f)
+        public bool MovementStarted(float velocityThreshold = 0.35f, float inputThreshold = 0.001f)
         {
-            if (HasHorizontalVelocityStartThisFrame(velocityThreshold))
+            if (BecameHorizontallyActive(PlayerControllerVelocityX, PlayerControllerVelocityZ, velocityThreshold))
                 return true;
 
-            if (HasMovementInputStartedThisFrame(inputThreshold))
+            if (BecameActive(MoveDirectionX, inputThreshold) || BecameActive(MoveDirectionZ, inputThreshold))
                 return true;
 
             return false;
         }
 
-        public bool HasHorizontalMovementThisFrame(float threshold = 0.01f)
+        public bool IsMovingHorizontally(float threshold = 0.35f)
         {
-            if (HasHorizontalMovement(DirectPositionX, DirectPositionZ, threshold))
-                return true;
-
-            return HasHorizontalMovement(PlayerLastPositionX, PlayerLastPositionZ, threshold);
+            return IsHorizontallyActive(PlayerControllerVelocityX, PlayerControllerVelocityZ, threshold);
         }
 
-        public bool HasActiveHorizontalVelocity(float threshold = 0.35f)
-        {
-            return HasHorizontalMagnitude(PlayerControllerVelocityX, PlayerControllerVelocityZ, threshold);
-        }
-
-        public bool HasBuilderMenuStartThisFrame()
+        public bool BuilderMenuOpened()
         {
             if (BuilderMenuState == null || !BuilderMenuState.Changed || !BuilderMenuState.New)
                 return false;
@@ -1118,7 +1053,7 @@ namespace LiveSplit.BelowZero
                 || string.Equals(ActiveToolName.Old, TechType.Builder.ToString(), StringComparison.OrdinalIgnoreCase);
         }
 
-        public bool HasSnowballPickupStartThisFrame()
+        public bool PickedUpSnowball()
         {
             if (!currentInventoryChanges.TryGetValue(TechType.SnowBall, out int delta) || delta != 1)
                 return false;
@@ -1151,48 +1086,40 @@ namespace LiveSplit.BelowZero
             return (global::LiveSplit.BelowZero.PDATab)PDATab.New == global::LiveSplit.BelowZero.PDATab.Inventory;
         }
 
-        private void UpdateCompletedStoryGoals()
+        private void UpdateStoryGoals()
         {
-            HashSet<StoryGoal> currentGoals = ReadCompletedStoryGoals();
-            storyGoalsCompletedThisFrame.Clear();
+            newlyCompletedStoryGoals.Clear();
+            if (!TryReadCompletedStoryGoals(out HashSet<string> currentGoals))
+                return;
+
             if (!storyGoalsInitialized)
             {
                 completedStoryGoals = currentGoals;
-                completedStoryGoalsOld = new HashSet<StoryGoal>(currentGoals);
                 storyGoalsInitialized = true;
                 return;
             }
 
-            completedStoryGoalsOld = completedStoryGoals;
-            completedStoryGoals = currentGoals;
-            foreach (StoryGoal goal in completedStoryGoals)
+            foreach (string goal in currentGoals)
             {
-                if (completedStoryGoalsOld.Contains(goal))
+                if (completedStoryGoals.Contains(goal))
                     continue;
 
-                storyGoalsCompletedThisFrame.Add(goal);
+                newlyCompletedStoryGoals.Add(goal);
                 logger.Log($"Story goal completed: {goal}");
             }
+
+            completedStoryGoals = currentGoals;
         }
 
-        private bool HasStoryGoalCompletedThisFrame(StoryGoal goal)
+        private bool CompletedStoryGoal(StoryGoal goal)
         {
             return goal != StoryGoal.None
-                && completedStoryGoals.Contains(goal)
-                && !completedStoryGoalsOld.Contains(goal);
+                && newlyCompletedStoryGoals.Contains(goal.ToString());
         }
 
-        private bool HasTransferStartedThisFrame()
+        private bool IsBraceSplitTriggered()
         {
-            return PrecursorTransferActive != null
-                && PrecursorTransferActive.Changed
-                && PrecursorTransferActive.New
-                && !PrecursorTransferActive.Old;
-        }
-
-        private bool TryConsumeBrace()
-        {
-            if (HasStoryGoalCompletedThisFrame(StoryGoal.EndGameEnterShip))
+            if (CompletedStoryGoal(StoryGoal.EndGameEnterShip))
             {
                 braceInteractionWindow.Restart();
                 braceReadyForCinematic = false;
@@ -1222,7 +1149,7 @@ namespace LiveSplit.BelowZero
                 return false;
             }
 
-            if (!HasBraceCinematicStartedThisFrame())
+            if (!BraceCinematicStarted())
                 return false;
 
             braceInteractionWindow.Reset();
@@ -1231,16 +1158,16 @@ namespace LiveSplit.BelowZero
             return true;
         }
 
-        private bool TryConsumeAcquireAlAn()
+        private bool IsAcquireAlAnSplitTriggered()
         {
-            if (HasAcquireAlAnCinematicStartedThisFrame())
+            if (AcquireAlAnCinematicStarted())
             {
                 ClearAcquireAlAnArmedState();
                 logger.Log("Acquire Al-An split: sanctuary cinematic started.");
                 return true;
             }
 
-            if (HasStoryGoalCompletedThisFrame(StoryGoal.SanctuaryCompleted))
+            if (CompletedStoryGoal(StoryGoal.SanctuaryCompleted))
             {
                 ClearAcquireAlAnArmedState();
                 logger.Log("Acquire Al-An split: SanctuaryCompleted story goal.");
@@ -1257,7 +1184,7 @@ namespace LiveSplit.BelowZero
             }
 
             if (acquireAlAnArmedGoal != StoryGoal.None
-                && storyGoalsCompletedThisFrame.Contains(acquireAlAnArmedGoal))
+                && CompletedStoryGoal(acquireAlAnArmedGoal))
             {
                 logger.Log($"Acquire Al-An split: armed story goal completed ({acquireAlAnArmedGoal}).");
                 ClearAcquireAlAnArmedState();
@@ -1267,60 +1194,79 @@ namespace LiveSplit.BelowZero
             return false;
         }
 
-        private bool IsDeathThisFrame()
+        private bool PlayerDied()
         {
-            return (Health.New <= 0 && Health.Old > 0) || (IsDying.New && !IsDying.Old);
+            return (Health.New <= 0 && Health.Old > 0)
+                || (DeathScreenActive.New && !DeathScreenActive.Old);
         }
 
-        private bool IsPlayableBiome(string biomeName)
+        private bool IsInsideBiome(Biome biome)
         {
-            return !isInMainMenu
-                && !string.IsNullOrWhiteSpace(biomeName)
-                && !string.Equals(biomeName, "None", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(biomeName, "MainMenu", StringComparison.OrdinalIgnoreCase);
+            return BiomeMatches(BiomeString.New, biome);
         }
 
-        private bool HasPlayableBiomeTransitionFrom(string sourceBiome)
+        private bool IsInsideBiomes(params Biome[] biomes)
         {
-            return !string.IsNullOrWhiteSpace(sourceBiome)
-                && BiomeString.Changed
-                && string.Equals(BiomeString.Old, sourceBiome, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(BiomeString.New, sourceBiome, StringComparison.OrdinalIgnoreCase)
-                && IsPlayableBiome(BiomeString.New);
+            return biomes != null && biomes.Any(IsInsideBiome);
         }
 
-        private bool HasKnownTech(params TechType[] techTypes)
+        private bool WasInsideBiome(Biome biome)
         {
-            return techTypes != null && techTypes.Any(techType => techType != TechType.None && KnownTech.Contains(techType));
+            return BiomeMatches(BiomeString.Old, biome);
         }
 
-        private bool HasKnownTechUnlockedThisFrame(params TechType[] techTypes)
+        private bool TransitionedFromBiome(Biome sourceBiome)
         {
-            return techTypes != null && techTypes.Any(techType =>
-                techType != TechType.None
-                && KnownTech.Contains(techType)
-                && !KnownTechOld.Contains(techType));
+            return BiomeString.Changed
+                && WasInsideBiome(sourceBiome)
+                && !IsInsideBiome(sourceBiome)
+                && !isInMainMenu
+                && !string.IsNullOrWhiteSpace(BiomeString.New)
+                && !string.Equals(BiomeString.New, "None", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(BiomeString.New, "MainMenu", StringComparison.OrdinalIgnoreCase);
         }
 
-        private bool IsSanctuaryBiome()
+        private bool TransitionedBetweenBiomes(Biome sourceBiome, Biome destinationBiome)
         {
-            return IsSanctuaryBiome(BiomeString.New);
+            return BiomeString.Changed
+                && WasInsideBiome(sourceBiome)
+                && IsInsideBiome(destinationBiome);
         }
 
-        private static bool IsSanctuaryBiome(string biomeName)
+        private static bool BiomeMatches(string currentBiome, Biome expectedBiome)
         {
-            return !string.IsNullOrEmpty(biomeName)
-                && biomeName.StartsWith("Precursor_Sanctuary", StringComparison.OrdinalIgnoreCase);
+            return expectedBiome != Biome.None
+                && expectedBiome != Biome.Any
+                && string.Equals(currentBiome, expectedBiome.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool KnowsTech(params TechType[] techTypes)
+        {
+            return techTypes != null
+                && techTypes.Any(techType => techType != TechType.None && KnownTech.Contains(techType));
+        }
+
+        private bool UnlockedTech(params TechType[] techTypes)
+        {
+            return techTypes != null
+                && techTypes.Any(techType => techType != TechType.None
+                    && KnownTech.Contains(techType)
+                    && !KnownTechOld.Contains(techType));
+        }
+
+        private bool IsInsideSanctuary()
+        {
+            return !string.IsNullOrEmpty(BiomeString.New)
+                && BiomeString.New.StartsWith("Precursor_Sanctuary", StringComparison.OrdinalIgnoreCase);
         }
 
         private void ClearAcquireAlAnArmedState()
         {
             acquireAlAnInteractionWindow.Reset();
             acquireAlAnArmedGoal = StoryGoal.None;
-            acquireAlAnDestroyBurstWindow.Reset();
         }
 
-        private bool TryConsumeThrownInventoryItem(TechType techType, string displayName)
+        private bool InventoryItemRemovedOutsidePDA(TechType techType, string displayName)
         {
             bool itemDropped = currentInventoryChanges.TryGetValue(techType, out int delta) && delta < 0;
             if (!itemDropped)
@@ -1328,22 +1274,17 @@ namespace LiveSplit.BelowZero
 
             if (IsPDAInventoryOpen())
             {
-                logger.Log($"Ignored {displayName} drop while PDA inventory was open.");
+                logger.Log($"Ignored {displayName} inventory removal while PDA inventory was open.");
                 return false;
             }
 
-            bool split = true;
-            logger.Log($"{displayName} drop detected outside PDA inventory.");
-            if (split && lastThrowSplitTool == techType && throwSplitCooldown.ElapsedMilliseconds <= minThrowSplitCooldownMs)
-                split = false;
+            logger.Log($"{displayName} removed from inventory outside PDA inventory.");
+            if (lastThrowSplitTool == techType && throwSplitCooldown.ElapsedMilliseconds <= minThrowSplitCooldownMs)
+                return false;
 
-            if (split)
-            {
-                lastThrowSplitTool = techType;
-                throwSplitCooldown.Restart();
-            }
-
-            return split;
+            lastThrowSplitTool = techType;
+            throwSplitCooldown.Restart();
+            return true;
         }
 
         private void UpdateEncyclopedia()
@@ -1363,29 +1304,29 @@ namespace LiveSplit.BelowZero
 
         private void UpdateCraftAndBuildState()
         {
-            startedCraftThisFrame = TechType.None;
-            completedCraftFallbackThisFrame = TechType.None;
-            completedBuildThisFrame = TechType.None;
+            startedCraft = TechType.None;
+            fallbackCompletedCraft = TechType.None;
+            completedBuild = TechType.None;
 
-            UpdateStartedCraftState();
+            if (CraftedNode != null && CraftedNode.Changed && CraftedNode.New != 0)
+                RecordStartedCraft((TechType)CraftedNode.New, "Craft");
+
             UpdateHoverpadCraftState();
             UpdateCraftAnalyticsState();
             UpdatePendingBuilderCompletion();
         }
 
-        private void UpdateStartedCraftState()
-        {
-            if (CraftedNode != null && CraftedNode.Changed && CraftedNode.New != 0)
-            {
-                TrySetStartedCraftThisFrame((TechType)CraftedNode.New, "Craft");
-            }
-        }
-
         private void UpdateHoverpadCraftState()
         {
-            IntPtr hoverpadConstructorPtr = ResolveTrackedHoverpadConstructorPointer();
+            IntPtr hoverpadConstructorPtr = trackedHoverpadConstructorPtr;
             if (hoverpadConstructorPtr == IntPtr.Zero || off_hoverpadConstructorConstructing == 0)
                 return;
+
+            if (!IsLiveManagedUnityObject(hoverpadConstructorPtr))
+            {
+                trackedHoverpadConstructorPtr = IntPtr.Zero;
+                return;
+            }
 
             bool isConstructing = game.Read<bool>(hoverpadConstructorPtr + off_hoverpadConstructorConstructing);
             if (!hoverpadConstructingInitialized)
@@ -1396,7 +1337,7 @@ namespace LiveSplit.BelowZero
             }
 
             if (!hoverpadConstructingOld && isConstructing)
-                TrySetStartedCraftThisFrame(TechType.Hoverbike, "Craft");
+                RecordStartedCraft(TechType.Hoverbike, "Craft");
 
             hoverpadConstructingOld = isConstructing;
         }
@@ -1435,7 +1376,7 @@ namespace LiveSplit.BelowZero
                 || BuilderLastTechType == null)
                 return;
 
-            bool manualSelectionThisFrame = BuilderMenuState != null
+            bool builderMenuClosed = BuilderMenuState != null
                 && BuilderMenuState.Changed
                 && BuilderMenuState.Old
                 && !BuilderMenuState.New;
@@ -1443,82 +1384,49 @@ namespace LiveSplit.BelowZero
             if (BuilderPrefab.Changed
                 && BuilderPrefab.Old == IntPtr.Zero
                 && BuilderPrefab.New != IntPtr.Zero
-                && !manualSelectionThisFrame
+                && !builderMenuClosed
                 && (TechType)BuilderLastTechType.New == pendingBuilderCompletionTechType)
             {
-                SetCompletedBuildThisFrame(pendingBuilderCompletionTechType);
+                completedBuild = pendingBuilderCompletionTechType;
+                logger.Log($"Build completed: {completedBuild}");
                 pendingBuilderCompletionTechType = TechType.None;
             }
         }
 
-        private void SetCompletedBuildThisFrame(TechType techType)
-        {
-            completedBuildThisFrame = techType;
-            logger.Log($"Build completed: {techType}");
-        }
-
-        private void TrySetStartedCraftThisFrame(TechType techType, string source)
+        private void RecordStartedCraft(TechType techType, string source)
         {
             if (techType == TechType.None)
                 return;
 
-            startedCraftThisFrame = techType;
+            startedCraft = techType;
             suppressCraftCompletionFallback.Add(techType);
-            logger.Log($"{source} started: {startedCraftThisFrame}");
+            logger.Log($"{source} started: {startedCraft}");
         }
 
         private bool TryConsumeStartedCraft(TechType techType)
         {
-            if (startedCraftThisFrame != techType)
+            if (startedCraft != techType)
                 return false;
 
-            startedCraftThisFrame = TechType.None;
+            startedCraft = TechType.None;
             return true;
         }
 
         private bool TryConsumeCompletedCraftFallback(TechType techType)
         {
-            if (completedCraftFallbackThisFrame != techType)
+            if (fallbackCompletedCraft != techType)
                 return false;
 
-            completedCraftFallbackThisFrame = TechType.None;
+            fallbackCompletedCraft = TechType.None;
             return true;
         }
 
         private bool TryConsumeCompletedBuild(TechType techType)
         {
-            if (completedBuildThisFrame != techType)
+            if (completedBuild != techType)
                 return false;
 
-            completedBuildThisFrame = TechType.None;
-            return true;
-        }
-
-        private void UpdateBridgeInteractiveState()
-        {
-            bridgeInsertThisFrame = false;
-            if (!currentInventoryChanges.TryGetValue(TechType.HydraulicFluid, out int hydraulicsFluidDelta)
-                || hydraulicsFluidDelta >= 0)
-            {
-                return;
-            }
-
-            if (IsPDAInventoryOpen())
-            {
-                logger.Log("Ignored Hydraulics Fluid drop while PDA inventory was open.");
-                return;
-            }
-
-            bridgeInsertThisFrame = true;
-            logger.Log("Bridge split: Insert Hydraulics Fluid");
-        }
-
-        private bool TryConsumeBridgeInsert()
-        {
-            if (!bridgeInsertThisFrame)
-                return false;
-
-            bridgeInsertThisFrame = false;
+            completedBuild = TechType.None;
             return true;
         }
 
@@ -1527,7 +1435,7 @@ namespace LiveSplit.BelowZero
             IntPtr previousAcquireAlAnTargetPtr = acquireAlAnTargetPtr;
             StoryGoal previousAcquireAlAnGoal = acquireAlAnTargetGoal;
             bool previousAcquireAlAnTargetActive = acquireAlAnTargetActive;
-            bool trackAcquireAlAn = Needs(SplitName.AcquireAlAnSplit) && IsSanctuaryBiome();
+            bool trackAcquireAlAn = Needs(SplitName.AcquireAlAnSplit) && IsInsideSanctuary();
             string acquireAlAnReticleText = trackAcquireAlAn ? GetHandReticleText() : string.Empty;
             bool acquireAlAnReticleActive = trackAcquireAlAn && IsAcquireAlAnReticleText(acquireAlAnReticleText);
 
@@ -1543,7 +1451,7 @@ namespace LiveSplit.BelowZero
                 if (string.Equals(typeName, "StoryHandTarget", StringComparison.OrdinalIgnoreCase)
                     && TryReadStoryHandTargetInfo(activeTarget, out string primaryTooltip, out string secondaryTooltip, out StoryGoal goal))
                 {
-                    if (IsSanctuaryBiome() && IsAcquireAlAnStoryTarget(primaryTooltip, secondaryTooltip))
+                    if (IsInsideSanctuary() && IsAcquireAlAnStoryTarget(primaryTooltip, secondaryTooltip))
                     {
                         acquireAlAnTargetActive = true;
                         acquireAlAnTargetPtr = activeTarget;
@@ -1558,7 +1466,8 @@ namespace LiveSplit.BelowZero
                         break;
 
                     case "GUI_HoverpadTerminal":
-                        trackedHoverpadConstructorPtr = ResolveHoverpadConstructorFromTerminal(activeTarget);
+                        trackedHoverpadConstructorPtr = ResolveHoverpadConstructorFromHoverpad(
+                            ReadObjectFieldPointer(activeTarget, off_hoverpadTerminalHoverpad));
                         break;
 
                     case "Hoverpad":
@@ -1582,21 +1491,6 @@ namespace LiveSplit.BelowZero
             {
                 ArmAcquireAlAnFromTargetLoss(previousAcquireAlAnTargetPtr, previousAcquireAlAnGoal);
             }
-        }
-
-        private IntPtr ResolveTrackedHoverpadConstructorPointer()
-        {
-            if (trackedHoverpadConstructorPtr != IntPtr.Zero && IsLiveManagedUnityObject(trackedHoverpadConstructorPtr))
-                return trackedHoverpadConstructorPtr;
-
-            trackedHoverpadConstructorPtr = IntPtr.Zero;
-            return IntPtr.Zero;
-        }
-
-        private IntPtr ResolveHoverpadConstructorFromTerminal(IntPtr terminalPtr)
-        {
-            IntPtr hoverpadPtr = ReadObjectFieldPointer(terminalPtr, off_hoverpadTerminalHoverpad);
-            return ResolveHoverpadConstructorFromHoverpad(hoverpadPtr);
         }
 
         private IntPtr ResolveHoverpadConstructorFromHoverpad(IntPtr hoverpadPtr)
@@ -1701,16 +1595,11 @@ namespace LiveSplit.BelowZero
 
             if (targetDestroyed)
             {
-                if (!acquireAlAnDestroyBurstWindow.IsRunning
-                    || acquireAlAnDestroyBurstWindow.ElapsedMilliseconds > acquireAlAnDestroyBurstWindowMs)
-                    acquireAlAnDestroyBurstWindow.Restart();
-                
-
                 logger.Log("Acquire Al-An target object was destroyed.");
             }
         }
 
-        private bool HasAcquireAlAnCinematicStartedThisFrame()
+        private bool AcquireAlAnCinematicStarted()
         {
             if (!acquireAlAnInteractionWindow.IsRunning)
                 return false;
@@ -1740,7 +1629,7 @@ namespace LiveSplit.BelowZero
             return false;
         }
 
-        private bool HasBraceCinematicStartedThisFrame()
+        private bool BraceCinematicStarted()
         {
             if (!braceInteractionWindow.IsRunning)
                 return false;
@@ -1834,9 +1723,9 @@ namespace LiveSplit.BelowZero
                     continue;
                 }
 
-                if (completedCraftFallbackThisFrame == TechType.None)
+                if (fallbackCompletedCraft == TechType.None)
                 {
-                    completedCraftFallbackThisFrame = pair.Key;
+                    fallbackCompletedCraft = pair.Key;
                     logger.Log($"Craft completion fallback observed: {pair.Key}");
                 }
             }
@@ -1849,7 +1738,7 @@ namespace LiveSplit.BelowZero
         public void ResetRunState(bool armHeldMovementStartAfterReset = false)
         {
             startedTimerBefore = false;
-            heldMovementStartArmedAfterReset = armHeldMovementStartAfterReset;
+            MovementStartArmed = armHeldMovementStartAfterReset;
             inventoryInitialized = false;
             blueprintsInitialized = false;
             encyclopediaInitialized = false;
@@ -1868,23 +1757,19 @@ namespace LiveSplit.BelowZero
             EncyclopediaOld.Clear();
             throwSplitCooldown.Reset();
             lastThrowSplitTool = TechType.None;
-            startedCraftThisFrame = TechType.None;
-            completedCraftFallbackThisFrame = TechType.None;
-            completedBuildThisFrame = TechType.None;
+            startedCraft = TechType.None;
+            fallbackCompletedCraft = TechType.None;
+            completedBuild = TechType.None;
             craftAnalyticsInitialized = false;
             craftCounts.Clear();
             suppressCraftCompletionFallback.Clear();
             storyGoalsInitialized = false;
-            completedStoryGoals = new HashSet<StoryGoal>();
-            completedStoryGoalsOld = new HashSet<StoryGoal>();
-            storyGoalsCompletedThisFrame = new HashSet<StoryGoal>();
-            storyGoalReaderMode = string.Empty;
+            completedStoryGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            newlyCompletedStoryGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             pendingBuilderCompletionTechType = TechType.None;
             builderMenuSelectionPending = false;
             builderMenuSelectionWindow.Reset();
-            bridgeInsertThisFrame = false;
             acquireAlAnInteractionWindow.Reset();
-            acquireAlAnDestroyBurstWindow.Reset();
             braceInteractionWindow.Reset();
             braceReadyForCinematic = false;
             acquireAlAnTargetActive = false;
@@ -1992,30 +1877,12 @@ namespace LiveSplit.BelowZero
             return factory.Make<T>(module.BaseAddress + moduleOffset, offsets);
         }
 
-        private static bool HasHorizontalMovement(Pointer<float> x, Pointer<float> z, float threshold)
+        public bool IsMovementInputActive(float threshold = 0.001f)
         {
-            if (x == null || z == null)
-                return false;
-
-            return Math.Abs(x.New - x.Old) > threshold || Math.Abs(z.New - z.Old) > threshold;
+            return IsAxisActive(MoveDirectionX, threshold) || IsAxisActive(MoveDirectionZ, threshold);
         }
 
-        private bool HasHorizontalVelocityStartThisFrame(float threshold)
-        {
-            return BecameHorizontallyActiveThisFrame(PlayerControllerVelocityX, PlayerControllerVelocityZ, threshold);
-        }
-
-        private bool HasMovementInputStartedThisFrame(float threshold)
-        {
-            return BecameActiveThisFrame(MoveDirectionX, threshold) || BecameActiveThisFrame(MoveDirectionZ, threshold);
-        }
-
-        public bool HasActiveMovementInput(float threshold = 0.001f)
-        {
-            return IsActive(MoveDirectionX, threshold) || IsActive(MoveDirectionZ, threshold);
-        }
-
-        private static bool BecameActiveThisFrame(Pointer<float> axis, float threshold)
+        private static bool BecameActive(Pointer<float> axis, float threshold)
         {
             if (axis == null)
                 return false;
@@ -2023,7 +1890,7 @@ namespace LiveSplit.BelowZero
             return Math.Abs(axis.New) > threshold && Math.Abs(axis.Old) <= threshold;
         }
 
-        private static bool HasHorizontalMagnitude(Pointer<float> x, Pointer<float> z, float threshold)
+        private static bool IsHorizontallyActive(Pointer<float> x, Pointer<float> z, float threshold)
         {
             if (x == null || z == null)
                 return false;
@@ -2031,7 +1898,7 @@ namespace LiveSplit.BelowZero
             return Math.Sqrt(x.New * x.New + z.New * z.New) > threshold;
         }
 
-        private static bool BecameHorizontallyActiveThisFrame(Pointer<float> x, Pointer<float> z, float threshold)
+        private static bool BecameHorizontallyActive(Pointer<float> x, Pointer<float> z, float threshold)
         {
             if (x == null || z == null)
                 return false;
@@ -2041,7 +1908,7 @@ namespace LiveSplit.BelowZero
             return oldMagnitude <= threshold && newMagnitude > threshold;
         }
 
-        private static bool IsActive(Pointer<float> axis, float threshold)
+        private static bool IsAxisActive(Pointer<float> axis, float threshold)
         {
             if (axis == null)
                 return false;
@@ -2346,101 +2213,65 @@ namespace LiveSplit.BelowZero
             return result;
         }
 
-        private HashSet<StoryGoal> ReadCompletedStoryGoals()
+        private bool TryReadCompletedStoryGoals(out HashSet<string> result)
         {
+            result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             IntPtr hashSetPtr = completedStoryGoalsPtr?.New ?? IntPtr.Zero;
-            if (hashSetPtr == IntPtr.Zero || hashset_off_slots == 0)
-                return new HashSet<StoryGoal>();
+            if (hashSetPtr == IntPtr.Zero || hashset_off_slots == 0 || hashset_off_count == 0)
+                return false;
 
-            int stringHeader = game.PointerSize * 2 + 0x4;
-            var candidates = new List<(HashSet<StoryGoal> Goals, string Mode, int Score)>();
+            int count = game.Read<int>(hashSetPtr + hashset_off_count);
+            if (count < 0 || count > 200000)
+                return false;
 
-            foreach (int slotsOffset in new[] { hashset_off_slots, 0x18, 0x20, 0x10 }.Distinct())
+            if (count == 0)
+                return true;
+
+            for (int attempt = 0; attempt < 3; attempt++)
             {
-                if (TryReadStoryGoalsFromSlotArray(hashSetPtr, slotsOffset, stringHeader, out HashSet<StoryGoal> slotGoals))
-                    candidates.Add((slotGoals, $"slot-array@0x{slotsOffset:X}", ScoreGoalSet(slotGoals)));
+                result.Clear();
+                int versionBefore = hashset_off_version != 0 ? game.Read<int>(hashSetPtr + hashset_off_version) : 0;
+                IntPtr slotsArr = game.Read<IntPtr>(hashSetPtr + hashset_off_slots);
+                if (slotsArr == IntPtr.Zero)
+                    return false;
 
-                if (TryReadStoryGoalsFromStringArray(hashSetPtr, slotsOffset, stringHeader, out HashSet<StoryGoal> stringGoals))
-                    candidates.Add((stringGoals, $"string-array@0x{slotsOffset:X}", ScoreGoalSet(stringGoals)));
+                int length = game.Read<int>(slotsArr + arr_off_len);
+                if (length <= 0 || length > 200000)
+                    return false;
+
+                int stringHeader = game.PointerSize * 2 + 0x4;
+                int slotStride = game.PointerSize == 8 ? 0x10 : 0x0C;
+                IntPtr basePtr = slotsArr + arr_data_base;
+                for (int i = 0; i < length; i++)
+                {
+                    IntPtr slot = basePtr + i * slotStride;
+                    if (game.Read<int>(slot) < 0)
+                        continue;
+
+                    IntPtr valuePtr = game.Read<IntPtr>(slot + 0x08);
+                    if (TryReadStoryGoalKey(valuePtr, stringHeader, out string goal))
+                        result.Add(goal);
+                }
+
+                int versionAfter = hashset_off_version != 0 ? game.Read<int>(hashSetPtr + hashset_off_version) : versionBefore;
+                if (versionAfter == versionBefore)
+                    return true;
             }
 
-            if (candidates.Count == 0)
-                return new HashSet<StoryGoal>();
-
-            var best = candidates
-                .OrderByDescending(candidate => candidate.Score)
-                .ThenByDescending(candidate => candidate.Goals.Count)
-                .First();
-
-            if (!string.Equals(storyGoalReaderMode, best.Mode, StringComparison.Ordinal))
-            {
-                storyGoalReaderMode = best.Mode;
-                logger.Log($"Story goal reader selected {storyGoalReaderMode} ({best.Goals.Count} goals).");
-            }
-
-            return best.Goals;
+            result.Clear();
+            return false;
         }
 
-        private bool TryReadStoryGoalsFromSlotArray(IntPtr hashSetPtr, int slotsOffset, int stringHeader, out HashSet<StoryGoal> result)
+        private bool TryReadStoryGoalKey(IntPtr valuePtr, int stringHeader, out string goal)
         {
-            result = new HashSet<StoryGoal>();
-            IntPtr slotsArr = game.Read<IntPtr>(hashSetPtr + slotsOffset);
-            if (slotsArr == IntPtr.Zero)
-                return false;
-
-            int len = game.Read<int>(slotsArr + arr_off_len);
-            if (len <= 0 || len > 200000)
-                return false;
-
-            int stride = game.PointerSize == 8 ? 0x10 : 0x0C;
-            IntPtr basePtr = slotsArr + arr_data_base;
-            for (int i = 0; i < len; i++)
-            {
-                IntPtr entry = basePtr + i * stride;
-                int hashCode = game.Read<int>(entry + 0x00);
-                if (hashCode < 0)
-                    continue;
-
-                IntPtr valuePtr = game.Read<IntPtr>(entry + 0x08);
-                if (TryReadStoryGoal(valuePtr, stringHeader, out StoryGoal goal))
-                    result.Add(goal);
-            }
-
-            return result.Count > 0;
-        }
-
-        private bool TryReadStoryGoalsFromStringArray(IntPtr hashSetPtr, int slotsOffset, int stringHeader, out HashSet<StoryGoal> result)
-        {
-            result = new HashSet<StoryGoal>();
-            IntPtr slotsArr = game.Read<IntPtr>(hashSetPtr + slotsOffset);
-            if (slotsArr == IntPtr.Zero)
-                return false;
-
-            int len = game.Read<int>(slotsArr + arr_off_len);
-            if (len <= 0 || len > 200000)
-                return false;
-
-            IntPtr basePtr = slotsArr + arr_data_base;
-            for (int i = 0; i < len; i++)
-            {
-                IntPtr valuePtr = game.Read<IntPtr>(basePtr + i * game.PointerSize);
-                if (TryReadStoryGoal(valuePtr, stringHeader, out StoryGoal goal))
-                    result.Add(goal);
-            }
-
-            return result.Count > 0;
-        }
-
-        private bool TryReadStoryGoal(IntPtr valuePtr, int stringHeader, out StoryGoal goal)
-        {
-            goal = StoryGoal.None;
+            goal = string.Empty;
             if (valuePtr == IntPtr.Zero)
                 return false;
 
             try
             {
-                string value = game.ReadString(valuePtr + stringHeader, EStringType.UTF16Sized);
-                return TryParseStoryGoal(value, out goal);
+                goal = game.ReadString(valuePtr + stringHeader, EStringType.UTF16Sized);
+                return !string.IsNullOrWhiteSpace(goal);
             }
             catch
             {
@@ -2455,32 +2286,6 @@ namespace LiveSplit.BelowZero
                 && Enum.IsDefined(typeof(StoryGoal), goal);
         }
 
-        private static int ScoreGoalSet(HashSet<StoryGoal> goals)
-        {
-            int score = 0;
-            foreach (StoryGoal goal in goals)
-            {
-                score += 1;
-
-                if (new[] { StoryGoal.SanctuaryCompleted, StoryGoal.EndGameEnterShip, StoryGoal.OnPrecursorNPCTransfer, StoryGoal.Log_Alan_BodyBuilt }.Contains(goal))
-                {
-                    score += 100;
-                }
-                else
-                {
-                    string name = goal.ToString();
-                    if (name.StartsWith("On", StringComparison.Ordinal)
-                        || name.StartsWith("Log_", StringComparison.Ordinal)
-                        || name.StartsWith("Call_", StringComparison.Ordinal)
-                        || name.StartsWith("Scan_", StringComparison.Ordinal))
-                    {
-                        score += 3;
-                    }
-                }
-            }
-
-            return score;
-        }
     }
 
     public class InvChangeInfo
