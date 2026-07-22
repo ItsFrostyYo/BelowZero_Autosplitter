@@ -242,6 +242,8 @@ namespace LiveSplit.BelowZero
                     SplitName.ThrowFlareSplit,
                     SplitName.ThrowSnowballSplit,
                     SplitName.DeathSplit,
+                    SplitName.EnterBaseSplit,
+                    SplitName.ExitBaseSplit,
                     SplitName.PropulsionCannonDrownSplit,
                     SplitName.TwistyBridgesDeathSplit,
                     SplitName.AcquireAlAnSplit,
@@ -260,6 +262,7 @@ namespace LiveSplit.BelowZero
                     SplitName.AlAnTransferDeathSplit,
                     SplitName.BraceSplit,
                     SplitName.InsertHydraulicsFluidSplit,
+                    SplitName.CureFrozenLeviathanSplit,
                 }
                 .Select(x => new ComboItem<SplitName> { Value = x, Display = x.GetDescription() })
                 .ToList());
@@ -275,6 +278,9 @@ namespace LiveSplit.BelowZero
 
         private static readonly Lazy<IReadOnlyList<ComboItem<EncyclopediaEntry>>> EncyclopediaEntries =
             new Lazy<IReadOnlyList<ComboItem<EncyclopediaEntry>>>(() => BuildEnumList<EncyclopediaEntry>(1));
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Artifact>>> Artifacts =
+            new Lazy<IReadOnlyList<ComboItem<Artifact>>>(() => BuildEnumList<Artifact>(1));
 
         private static readonly Lazy<IReadOnlyList<ComboItem<Biome>>> Biomes =
             new Lazy<IReadOnlyList<ComboItem<Biome>>>(() => BuildEnumList<Biome>(1));
@@ -293,6 +299,9 @@ namespace LiveSplit.BelowZero
 
         private static readonly Lazy<IReadOnlyList<ComboItem<EncyclopediaEntry>>> EncyclopediaEntriesAlpha =
             new Lazy<IReadOnlyList<ComboItem<EncyclopediaEntry>>>(() => EncyclopediaEntries.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Artifact>>> ArtifactsAlpha =
+            new Lazy<IReadOnlyList<ComboItem<Artifact>>>(() => Artifacts.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
 
         private static readonly Lazy<IReadOnlyList<ComboItem<Biome>>> BiomesAlpha =
             new Lazy<IReadOnlyList<ComboItem<Biome>>>(() => Biomes.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
@@ -395,6 +404,9 @@ namespace LiveSplit.BelowZero
                 case BelowZeroBlueprintSplit _:
                     BindCombo(setting.ComboBox, GetBlueprints(alpha), setting.ComboBox.SelectedValue, alpha);
                     break;
+                case BelowZeroEncyclopediaSplit artifactSetting when artifactSetting.Split is ArtifactSplit:
+                    BindCombo(setting.ComboBox, alpha ? ArtifactsAlpha.Value : Artifacts.Value, setting.ComboBox.SelectedValue, alpha);
+                    break;
                 case BelowZeroEncyclopediaSplit _:
                     BindCombo(setting.ComboBox, GetEncyclopediaEntries(alpha), setting.ComboBox.SelectedValue, alpha);
                     break;
@@ -457,6 +469,15 @@ namespace LiveSplit.BelowZero
         public BelowZeroItemSplit CreateItemSplit(bool isSubCondition) => CreateSplit<BelowZeroItemSplit, InventoryItem>(Alpha.Checked ? ItemsAlpha.Value : Items.Value, s => s.cboItem, isSubCondition);
         public BelowZeroBlueprintSplit CreateBlueprintSplit(bool isSubCondition) => CreateSplit<BelowZeroBlueprintSplit, Unlockable>(GetBlueprints(Alpha.Checked), s => s.cboBlueprint, isSubCondition);
         public BelowZeroEncyclopediaSplit CreateEncyclopediaSplit(bool isSubCondition) => CreateSplit<BelowZeroEncyclopediaSplit, EncyclopediaEntry>(GetEncyclopediaEntries(Alpha.Checked), s => s.cboEncy, isSubCondition);
+        public BelowZeroEncyclopediaSplit CreateArtifactSplit(bool isSubCondition)
+        {
+            var setting = new BelowZeroEncyclopediaSplit(new ArtifactSplit(Artifact.None, onlySplitOnce: true, isSubCondition));
+            BindCombo(setting.cboEncy, Alpha.Checked ? ArtifactsAlpha.Value : Artifacts.Value, null, Alpha.Checked);
+            setting.IsSubCondition = isSubCondition;
+            setting.Split.IsSubCondition = isSubCondition;
+            AddHandlers(setting);
+            return setting;
+        }
         public BelowZeroCraftSplit CreateCraftSplit(bool isSubCondition) => CreateCraftableSplit(new CraftSplit(Craftable.None, onlySplitOnce: true, isSubCondition: false), Alpha.Checked ? CraftablesAlpha.Value : Craftables.Value, isSubCondition);
         public BelowZeroCraftSplit CreateBuildSplit(bool isSubCondition) => CreateCraftableSplit(new BuildSplit(Craftable.None, onlySplitOnce: true, isSubCondition: false), GetBuildables(Alpha.Checked), isSubCondition);
         public BelowZeroBiomeSplit CreateBiomeSplit(bool isSubCondition)
@@ -556,6 +577,12 @@ namespace LiveSplit.BelowZero
                             setting = new BelowZeroBlueprintSplit(s) { IsLoadingGetter = () => this.IsLoading };
                             ApplyDataSources(setting, Alpha.Checked);
                             setting.ComboBox.SelectedValue = ((BlueprintSplit)setting.Split).Blueprint;
+                            break;
+
+                        case ArtifactSplit s:
+                            setting = new BelowZeroEncyclopediaSplit(s) { IsLoadingGetter = () => this.IsLoading };
+                            ApplyDataSources(setting, Alpha.Checked);
+                            setting.ComboBox.SelectedValue = s.Artifact;
                             break;
 
                         case EncyclopediaSplit s:

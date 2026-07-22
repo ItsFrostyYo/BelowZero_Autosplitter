@@ -272,6 +272,7 @@ namespace LiveSplit.BelowZero
         SpyPenguin = 8030,
         SpyPenguinRemote = 8033,
         PosterAlterraBounty = 8036,
+        RadioTowerTOM = 8045,
         PosterParvan = 8047,
         PosterBunkerCommunity = 8050,
         PosterZetaRollerDerby = 8052,

@@ -22,6 +22,7 @@ namespace LiveSplit.BelowZero.Settings
             items.Add(new SplitType { Text = "Inventory", Func = settings.CreateItemSplit });
             items.Add(new SplitType { Text = "Blueprint", Func = settings.CreateBlueprintSplit });
             items.Add(new SplitType { Text = "Encyclopedia", Func = settings.CreateEncyclopediaSplit });
+            items.Add(new SplitType { Text = "Artifacts", Func = settings.CreateArtifactSplit });
             items.Add(new SplitType { Text = "Biome", Func = settings.CreateBiomeSplit });
 
             cboSplitType.DisplayMember = nameof(SplitType.Text);

@@ -1,13 +1,17 @@
 .vs/
 
+LiveSplit.DropPodLocation/bin/
+LiveSplit.DropPodLocation/obj/
 Livesplit.BelowZero/bin/
 Livesplit.BelowZero/obj/
+
 
 Components/*.dll
 Components/*.pdb
 Components/*.xml
 !Components/LiveSplit.BelowZero.dll
 !Components/BelowZero.Updates.xml
+!Components/Livesplit.DropPodLocation.dll
 
 _work/
 LocalPaths.md

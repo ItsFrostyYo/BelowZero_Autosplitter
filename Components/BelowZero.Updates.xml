@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <updates>
+    <update version="1.3.0.0">
+        <files>
+            <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>
+        </files>
+        <changelog>
+            <change>Add Enter Base and Exit Base Split</change>
+            <change>Add Artifacts Split Category (12 Unique not 15 Total)</change>
+            <change>Few Small Changes</change>
+            <change>Update Internal Helpers, Remove Useless ones, Change Names, Add New Ones for Specific Things</change>
+        </changelog>
+    </update>
+    <update version="1.0.0.0">
+        <files>
+            <file path="Components/LiveSplit.DropPodLocation.dll" status="changed"/>
+        </files>
+        <changelog>
+            <change>Added Log Based Drop Pod Location Resolver</change>
+        </changelog>
+    </update>
     <update version="1.2.0.0">
         <files>
             <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>

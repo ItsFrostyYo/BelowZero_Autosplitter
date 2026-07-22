@@ -21,6 +21,7 @@ namespace LiveSplit.BelowZero
         private string lastUpdateState = string.Empty;
         private string lastOrderedSplitDescription = string.Empty;
         private readonly HashSet<BelowZeroSplit> alreadySplit = new HashSet<BelowZeroSplit>();
+        private bool survivalStartArmed;
 
         public BelowZeroComponent(LiveSplitState state) : base(state)
         {
@@ -53,25 +54,9 @@ namespace LiveSplit.BelowZero
             logger.Log(state);
         }
 
-        private void LogStartStateChanges()
-        {
-            if (memory.PlayerControllerInputEnabled.Changed)
-                logger.Log($"Input enabled changed: {memory.PlayerControllerInputEnabled.Old} -> {memory.PlayerControllerInputEnabled.New}");
-
-            if (memory.IsLoadingScreenShowing.Changed)
-                logger.Log($"Loading screen changed: {memory.IsLoadingScreenShowing.Old} -> {memory.IsLoadingScreenShowing.New}");
-
-            if (memory.IsIntroCinematicActive.Changed)
-                logger.Log($"Intro cinematic changed: {memory.IsIntroCinematicActive.Old} -> {memory.IsIntroCinematicActive.New}");
-
-            if (memory.PDATab.Changed)
-                logger.Log($"PDA tab changed: {(PDATab)memory.PDATab.Old} -> {(PDATab)memory.PDATab.New}");
-        }
-
         private bool MarkStarted(string reason)
         {
             logger.Log(reason);
-            memory.MovementStartArmed = false;
             memory.startedTimerBefore = true;
             return true;
         }
@@ -92,98 +77,66 @@ namespace LiveSplit.BelowZero
             logger.Log($"Ordered split armed: {description}");
         }
 
-        private bool IsAutomaticIntroUiStateActive()
+        private bool TryInputStart()
         {
-            if (memory.IsLoadingScreenShowing?.New ?? false)
-                return true;
+            bool inputEnabled = memory.PlayerControllerInputEnabled?.New ?? false;
 
-            if (memory.IsIntroCinematicActive?.New ?? false)
-                return true;
+            if (memory.HorizontalMovementStarted())
+                return MarkStarted("Start of Move");
 
-            return (PDATab)memory.PDATab.New == PDATab.Intro;
-        }
+            if (inputEnabled && memory.PlayerJumped())
+                return MarkStarted("Start of Jump");
 
-        private bool PDAStartTriggered()
-        {
-            if (!memory.PDATab.Changed)
-                return false;
+            if (memory.PDAOpenedOrClosed())
+                return MarkStarted("Start of PDA Open/Close");
 
-            if (!(memory.PlayerControllerInputEnabled?.New ?? true))
-                return false;
+            if (inputEnabled && memory.PickedUpSnowball())
+                return MarkStarted("Start of Snowball Pickup");
 
-            if (memory.IsIntroCinematicActive?.New ?? false)
-                return false;
+            if (inputEnabled && memory.BuilderMenuOpened())
+                return MarkStarted("Start of Builder Menu");
 
-            if (memory.IsLoadingScreenShowing?.New ?? false)
-                return false;
-
-            PDATab oldTab = (PDATab)memory.PDATab.Old;
-            PDATab tab = (PDATab)memory.PDATab.New;
-            return oldTab == PDATab.None && tab != PDATab.None && tab != PDATab.Intro;
-        }
-
-        private bool TryStartFromPlayerAction(string context)
-        {
-            if (memory.isInMainMenu)
-                return false;
-
-            if (memory.PlayerMain?.New == IntPtr.Zero)
-                return false;
-
-            if (!(memory.PlayerControllerInputEnabled?.New ?? false))
-                return false;
-
-            if (memory.MovementStartArmed
-                && !IsAutomaticIntroUiStateActive()
-                && memory.IsMovementInputActive(0.001f))
-            {
-                return MarkStarted($"{context}: Start of Move (held after reset)");
-            }
-
-            if (memory.MovementStarted(0.35f, 0.001f))
-            {
-                return MarkStarted($"{context}: Start of Move");
-            }
-
-            bool becameStartEligible =
-                (memory.IsLoadingScreenShowing.Changed && !memory.IsLoadingScreenShowing.New)
-                || (memory.PlayerControllerInputEnabled.Changed && memory.PlayerControllerInputEnabled.New);
-
-            if (becameStartEligible &&
-                (memory.IsMovingHorizontally(0.35f)
-                 || memory.IsMovementInputActive(0.001f)))
-            {
-                return MarkStarted($"{context}: Start of Move (held input)");
-            }
-
-            if (memory.IsPlayerJumping.New && memory.IsPlayerJumping.Changed)
-            {
-                return MarkStarted($"{context}: Start of Jump");
-            }
-
-            if (memory.BuilderMenuOpened())
-            {
-                return MarkStarted($"{context}: Start of Builder Menu");
-            }
-
-            if (memory.PickedUpSnowball())
-            {
-                return MarkStarted($"{context}: Start of Snowball Pickup");
-            }
-
-            if (!IsAutomaticIntroUiStateActive() &&
-                memory.CraftingMenu.New != IntPtr.Zero &&
-                memory.CraftingMenu.Old == IntPtr.Zero)
-            {
-                return MarkStarted($"{context}: Start of Crafting Menu");
-            }
-
-            if (PDAStartTriggered())
-            {
-                return MarkStarted($"{context}: Start of PDA");
-            }
+            if (memory.CraftingMenuOpened())
+                return MarkStarted("Start of Crafting Menu");
 
             return false;
+        }
+
+        private void UpdateSurvivalStartState()
+        {
+            if (!settings.IntroStart)
+            {
+                ResetSurvivalStartState();
+                return;
+            }
+
+            if (!survivalStartArmed && (memory.IsIntroCinematicActive?.New ?? false))
+            {
+                survivalStartArmed = true;
+                logger.Log("Survival Start armed: intro cinematic started.");
+            }
+        }
+
+        private bool TrySurvivalStart()
+        {
+            if (!survivalStartArmed)
+                return false;
+
+            bool cinematicEnded = !(memory.IsIntroCinematicActive?.New ?? true)
+                && !(memory.IsLoadingScreenShowing?.New ?? true);
+
+            if (cinematicEnded && memory.PlayerMovedHorizontally())
+                return MarkStarted("Survival Start: first actual horizontal player movement");
+
+            if (memory.IntroCompleted())
+                return MarkStarted("Survival Start fallback: intro completed and gameplay resumed");
+
+            return false;
+        }
+
+        private void ResetSurvivalStartState()
+        {
+            survivalStartArmed = false;
         }
 
         public override bool Update()
@@ -231,14 +184,25 @@ namespace LiveSplit.BelowZero
             if (memory.startedTimerBefore || !memory.pointersInitialized || !settings.StartEnabled)
                 return false;
 
-            LogStartStateChanges();
+            if (memory.isInMainMenu)
+            {
+                ResetSurvivalStartState();
+                return false;
+            }
 
-            if (!memory.IsLoadingScreenShowing.New &&
-                !memory.isInMainMenu &&
-                TryStartFromPlayerAction("Start"))
-                return true;
+            UpdateSurvivalStartState();
 
-            return false;
+            if (settings.IntroStart && survivalStartArmed)
+                return TrySurvivalStart();
+
+            if (!settings.CreativeStart
+                || memory.PlayerMain?.New == IntPtr.Zero
+                || (memory.IsLoadingScreenShowing?.New ?? true)
+                || (memory.IsIntroCinematicActive?.New ?? true)
+                || !(memory.PlayerControllerInputEnabled?.New ?? false))
+                return false;
+
+            return TryInputStart();
         }
 
         public override bool Split()
@@ -353,7 +317,8 @@ namespace LiveSplit.BelowZero
         {
             alreadySplit.Clear();
             lastOrderedSplitDescription = string.Empty;
-            memory.ResetRunState(armHeldMovementStartAfterReset: true);
+            ResetSurvivalStartState();
+            memory.ResetRunState();
             logger.Log("Run state cleared on timer reset.");
         }
     }

@@ -208,9 +208,9 @@ namespace LiveSplit.BelowZero
             this.chkCreativeStart.Name = "chkCreativeStart";
             this.chkCreativeStart.Size = new System.Drawing.Size(90, 17);
             this.chkCreativeStart.TabIndex = 1;
-            this.chkCreativeStart.Text = "Creative Start";
+            this.chkCreativeStart.Text = "Start on Input";
+            this.ToolTips.SetToolTip(this.chkCreativeStart, "Starts on movement input, jumping, PDA use, a snowball pickup, or opening a builder or crafting menu.");
             this.chkCreativeStart.UseVisualStyleBackColor = true;
-            this.chkCreativeStart.Visible = false;
             this.chkCreativeStart.CheckedChanged += new System.EventHandler(this.ControlChanged);
             // 
             // chkIntroStart
@@ -224,8 +224,8 @@ namespace LiveSplit.BelowZero
             this.chkIntroStart.Name = "chkIntroStart";
             this.chkIntroStart.Size = new System.Drawing.Size(48, 17);
             this.chkIntroStart.TabIndex = 0;
-            this.chkIntroStart.Text = "Start";
-            this.ToolTips.SetToolTip(this.chkIntroStart, "Starts when you first move or interact after gaining control.");
+            this.chkIntroStart.Text = "Survival Start";
+            this.ToolTips.SetToolTip(this.chkIntroStart, "Arms during the opening cinematic, starts on actual horizontal player movement, and falls back to intro completion.");
             this.chkIntroStart.UseVisualStyleBackColor = true;
             this.chkIntroStart.CheckedChanged += new System.EventHandler(this.ControlChanged);
             // 

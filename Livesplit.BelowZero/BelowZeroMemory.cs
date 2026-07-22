@@ -61,30 +61,27 @@ namespace LiveSplit.BelowZero
         private string storyGoalReaderMode = string.Empty;
         private int storyGoalSlotsOffset;
         private bool storyGoalUsesStringArray;
-        public bool MovementStartArmed { get; set; }
         private int playerInventorySlotsUsed;
         private int playerInventorySlotsUsedOld;
         private int unityObjectCachedPtrOffset = 0x10;
 
         public Pointer<bool> IsIntroCinematicActive;
-        private Pointer<bool> IsAnimationPlaying;
+        private Pointer<bool> AnimationPlaying;
         public Pointer<bool> IsLoadingScreenShowing;
         public Pointer<bool> IsPlayerJumping;
         private Pointer<bool> DeathScreenActive;
         public Pointer<bool> PlayerControllerInputEnabled;
-        private Pointer<float> PlayerControllerVelocityX;
-        private Pointer<float> PlayerControllerVelocityZ;
         private Pointer<float> Health;
-        private Pointer<float> MoveDirectionX;
-        private Pointer<float> MoveDirectionZ;
+        private Pointer<MovementVector> MoveDirection;
+        private Pointer<MovementVector> PlayerControllerVelocity;
         private Pointer<bool> BuilderMenuState;
         private Pointer<int> BuilderLastTechType;
-        private Pointer<bool> PlayerIsUnderwater;
-        private Pointer<bool> PlayerIsInside;
+        private Pointer<bool> CurrentSubIsBase;
         private Pointer<IntPtr> MainMenu;
         private Pointer<IntPtr> BuilderPrefab;
         public Pointer<IntPtr> PlayerMain;
-        public Pointer<IntPtr> CraftingMenu;
+        private Pointer<IntPtr> CurrentSub;
+        private Pointer<IntPtr> CraftingMenu;
         private Pointer<IntPtr> GuiHandActiveTarget;
         private Pointer<IntPtr> craftingAnalyticsEntriesPtr;
         private Pointer<IntPtr> knownTechPtr;
@@ -183,7 +180,7 @@ namespace LiveSplit.BelowZero
                 DirectPositionX = null;
                 DirectPositionY = null;
                 DirectPositionZ = null;
-                IsAnimationPlaying = null;
+                AnimationPlaying = null;
                 IsIntroCinematicActive = null;
 
                 if (unityTask != null)
@@ -204,6 +201,7 @@ namespace LiveSplit.BelowZero
                 { SplitName.Inventory, IsInventorySubConditionMet },
                 { SplitName.Blueprint, () => KnowsTech(((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>()) },
                 { SplitName.Encyclopedia, () => Encyclopedia.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) },
+                { SplitName.Artifact, () => Encyclopedia.Contains(((ArtifactSplit)CurrentSplitToCheck).Entry) },
                 { SplitName.Biome, IsBiomeSubConditionMet },
             };
         }
@@ -215,16 +213,19 @@ namespace LiveSplit.BelowZero
                 { SplitName.Inventory, IsInventorySplitTriggered },
                 { SplitName.Blueprint, () => UnlockedTech(((BlueprintSplit)CurrentSplitToCheck).Blueprint.ConvertTo<TechType>()) },
                 { SplitName.Encyclopedia, () => Encyclopedia.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) && !EncyclopediaOld.Contains(((EncyclopediaSplit)CurrentSplitToCheck).Entry) },
+                { SplitName.Artifact, () => Encyclopedia.Contains(((ArtifactSplit)CurrentSplitToCheck).Entry) && !EncyclopediaOld.Contains(((ArtifactSplit)CurrentSplitToCheck).Entry) },
                 { SplitName.Biome, IsBiomeSplitTriggered },
                 { SplitName.Craft, IsCraftSplitTriggered },
                 { SplitName.Build, () => TryConsumeCompletedBuild(((BuildSplit)CurrentSplitToCheck).Craftable.ConvertTo<TechType>()) },
-                { SplitName.FullInventorySplit, () => playerInventorySlotsUsed == inventoryCapacitySlots && playerInventorySlotsUsedOld != inventoryCapacitySlots },
+                { SplitName.EnterBaseSplit, () => CurrentSub.New != IntPtr.Zero && CurrentSub.Old == IntPtr.Zero && CurrentSubIsBase.New },
+                { SplitName.ExitBaseSplit, () => CurrentSub.Old != IntPtr.Zero && CurrentSub.New == IntPtr.Zero && CurrentSubIsBase.Old },
+                { SplitName.FullInventorySplit, IsInventoryFull },
                 { SplitName.DeathSplit, PlayerDied },
-                { SplitName.ThrowFlareSplit, () => InventoryItemRemovedOutsidePDA(TechType.Flare, "Flare") },
-                { SplitName.ThrowSnowballSplit, () => InventoryItemRemovedOutsidePDA(TechType.SnowBall, "Snowball") },
+                { SplitName.ThrowFlareSplit, () => InventoryItemRemovedOutsidePDA(TechType.Flare) },
+                { SplitName.ThrowSnowballSplit, () => InventoryItemRemovedOutsidePDA(TechType.SnowBall) },
                 { SplitName.PropulsionCannonDrownSplit, () => PlayerDied() && IsInsideBiomes(Biome.arctickelp_caveinner, Biome.arctickelp_caveouter) && KnowsTech(TechType.PropulsionCannon, TechType.PropulsionCannonBlueprint) },
                 { SplitName.TwistyBridgesDeathSplit, () => PlayerDied() && IsInsideBiomes(Biome.twistyBridges, Biome.twistyBridges_Deep) },
-                { SplitName.AcquireAlAnSplit, () => IsAnimationPlaying != null && IsAnimationPlaying.Changed && IsAnimationPlaying.New && !IsAnimationPlaying.Old && !string.IsNullOrEmpty(BiomeString.New) && BiomeString.New.StartsWith("Precursor_Sanctuary", StringComparison.OrdinalIgnoreCase) },
+                { SplitName.AcquireAlAnSplit, () => IsAnimationPlaying() && !string.IsNullOrEmpty(BiomeString.New) && BiomeString.New.StartsWith("Precursor_Sanctuary", StringComparison.OrdinalIgnoreCase) },
                 { SplitName.BoosterTankDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.purpleVents) && KnowsTech(TechType.SuitBoosterTank) },
                 { SplitName.ArcticSpiresScanSplit, () => UnlockedTech(TechType.PrecursorNPCTissue) },
                 { SplitName.ArcticSpiresDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.ArcticSpiresCache) },
@@ -240,6 +241,7 @@ namespace LiveSplit.BelowZero
                 { SplitName.AlAnTransferDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.Precursor_Fabricator) },
                 { SplitName.BraceSplit, IsBraceSplitTriggered },
                 { SplitName.InsertHydraulicsFluidSplit, () => CompletedStoryGoal(StoryGoal.OnGlacialBasinBridgeItemInserted) },
+                { SplitName.CureFrozenLeviathanSplit, () => CompletedStoryGoal(StoryGoal.OnFrozenCreatureAntidoteInserted) },
             };
         }
 
@@ -247,7 +249,7 @@ namespace LiveSplit.BelowZero
         {
             ItemSplit split = (ItemSplit)CurrentSplitToCheck;
             TechType techType = split.Item.ConvertTo<TechType>();
-            return !split.IsCount ? HasPlayerItem(techType) : GetPlayerItemCount(techType) == split.Count;
+            return !split.IsCount ? PlayerHasItem(techType) : GetPlayerItemCount(techType) == split.Count;
         }
 
         private bool IsBiomeSubConditionMet()
@@ -354,8 +356,14 @@ namespace LiveSplit.BelowZero
                 DeathScreenActive.ForceUpdate();
             }
 
-            if (Needs(usedSplitNames, SplitName.Encyclopedia))
+            if (Needs(usedSplitNames, SplitName.Encyclopedia, SplitName.Artifact))
                 UpdateEncyclopedia();
+
+            if (Needs(usedSplitNames, SplitName.EnterBaseSplit, SplitName.ExitBaseSplit))
+            {
+                CurrentSub.ForceUpdate();
+                CurrentSubIsBase.ForceUpdate();
+            }
 
             UpdateStoryGoals();
 
@@ -410,15 +418,15 @@ namespace LiveSplit.BelowZero
 
             InitializeVersionSpecificSignalPointers();
 
-            if (IsAnimationPlaying == null)
+            if (AnimationPlaying == null)
             {
-                IsAnimationPlaying = ptrFactory.Make<bool>("Player", "main", "_cinematicModeActive");
+                AnimationPlaying = ptrFactory.Make<bool>("Player", "main", "_cinematicModeActive");
                 logger.Log("Using Player._cinematicModeActive animation pointer.");
             }
 
             if (IsIntroCinematicActive == null)
             {
-                IsIntroCinematicActive = IsAnimationPlaying;
+                IsIntroCinematicActive = AnimationPlaying;
                 logger.Log("Using animation pointer as intro cinematic fallback.");
             }
 
@@ -527,6 +535,10 @@ namespace LiveSplit.BelowZero
             MainMenu = ptrFactory.Make<IntPtr>("uGUI_MainMenu", "main");
             PlayerMain = ptrFactory.Make<IntPtr>("Player", "main");
             IntPtr playerKlass = mono.FindClass("Player", mono.MainImage);
+            int off_currentSub = mono.GetFieldOffset(playerKlass, "_currentSub");
+            CurrentSub = ptrFactory.Make<IntPtr>(PlayerMain, off_currentSub);
+            int off_subRootIsBase = mono.GetFieldOffset(mono.FindClass("SubRoot", mono.MainImage), "isBase");
+            CurrentSubIsBase = ptrFactory.Make<bool>(CurrentSub, off_subRootIsBase);
             int off_lastPosition = unity.ResolveFieldOffsetByNameOrPredicate(
                 playerKlass,
                 new[] { "lastPosition", "_lastPosition", "m_lastPosition" },
@@ -559,8 +571,8 @@ namespace LiveSplit.BelowZero
 
             int off_client = mono.GetFieldOffset(mono.FindClass("uGUI_CraftingMenu"), "_client");
             CraftingMenu = ptrFactory.Make<IntPtr>(craftingMenuRootPtr, off_client);
-            MoveDirectionX = ptrFactory.Make<float>("GameInput", "moveDirection", 0x0);
-            MoveDirectionZ = ptrFactory.Make<float>("GameInput", "moveDirection", 0x8);
+
+            MoveDirection = ptrFactory.Make<MovementVector>("GameInput", "moveDirection");
 
             Pointer<IntPtr> groundMotorPtr = ptrFactory.Make<IntPtr>("Player", "main", "groundMotor");
             int off_jumpState = mono.GetFieldOffset(mono.FindClass("GroundMotor"), "jumping");
@@ -580,8 +592,7 @@ namespace LiveSplit.BelowZero
 
             Pointer<IntPtr> playerControllerPtr = ptrFactory.Make<IntPtr>("Player", "main", "<playerController>k__BackingField");
             int off_velocity = mono.GetFieldOffset(mono.FindClass("PlayerController"), "velocity");
-            PlayerControllerVelocityX = ptrFactory.Make<float>(playerControllerPtr, off_velocity + 0x0);
-            PlayerControllerVelocityZ = ptrFactory.Make<float>(playerControllerPtr, off_velocity + 0x8);
+            PlayerControllerVelocity = ptrFactory.Make<MovementVector>(playerControllerPtr, off_velocity);
             int off_inputEnabled = mono.GetFieldOffset(mono.FindClass("PlayerController"), "inputEnabled");
             PlayerControllerInputEnabled = ptrFactory.Make<bool>(playerControllerPtr, off_inputEnabled);
 
@@ -591,22 +602,6 @@ namespace LiveSplit.BelowZero
             BuilderMenuState = ptrFactory.Make<bool>(builderMenuSingletonPtr, off_builderMenuState);
             BuilderLastTechType = ptrFactory.Make<int>("Builder", "<lastTechType>k__BackingField");
             BuilderPrefab = ptrFactory.Make<IntPtr>("Builder", "prefab");
-
-            int off_playerUnderwater = mono.GetFieldOffset(playerKlass, "playerUnderwater");
-            int off_playerInside = mono.GetFieldOffset(playerKlass, "playerInside");
-            Pointer<IntPtr> playerUnderwaterPtr = ptrFactory.Make<IntPtr>(PlayerMain, off_playerUnderwater);
-            Pointer<IntPtr> playerInsidePtr = ptrFactory.Make<IntPtr>(PlayerMain, off_playerInside);
-
-            IntPtr boolVariableKlass = mono.FindClass("BoolVariable", mono.MainImage);
-            if (boolVariableKlass == IntPtr.Zero)
-                boolVariableKlass = mono.FindClass("PlayerEmotes.BoolVariable", mono.MainImage);
-
-            if (boolVariableKlass != IntPtr.Zero)
-            {
-                int off_boolVariableValue = mono.GetFieldOffset(boolVariableKlass, "value");
-                PlayerIsUnderwater = ptrFactory.Make<bool>(playerUnderwaterPtr, off_boolVariableValue);
-                PlayerIsInside = ptrFactory.Make<bool>(playerInsidePtr, off_boolVariableValue);
-            }
 
             IntPtr hoverpadKlass = mono.FindClass("Hoverpad", mono.MainImage);
             off_hoverpadConstructorField = mono.GetFieldOffset(hoverpadKlass, "constructor");
@@ -786,20 +781,38 @@ namespace LiveSplit.BelowZero
             }
         }
 
-        public bool MovementStarted(float velocityThreshold = 0.35f, float inputThreshold = 0.001f)
+        public bool HorizontalMovementStarted()
         {
-            if (BecameHorizontallyActive(PlayerControllerVelocityX, PlayerControllerVelocityZ, velocityThreshold))
-                return true;
+            if (MoveDirection == null)
+                return false;
 
-            if (BecameActive(MoveDirectionX, inputThreshold) || BecameActive(MoveDirectionZ, inputThreshold))
-                return true;
-
-            return false;
+            MovementVector current = MoveDirection.New;
+            MovementVector previous = MoveDirection.Old;
+            return (current.Z != 0f && previous.Z == 0f)
+                || (current.X != 0f && previous.X == 0f);
         }
 
-        public bool IsMovingHorizontally(float threshold = 0.35f)
+        public bool PlayerMovedHorizontally(float threshold = 0.001f)
         {
-            return IsHorizontallyActive(PlayerControllerVelocityX, PlayerControllerVelocityZ, threshold);
+            if (PlayerControllerVelocity == null)
+                return false;
+
+            // GroundMotor writes this after CharacterController.Move and derives it
+            // from the player's actual before/after world position.
+            MovementVector movement = PlayerControllerVelocity.New;
+            return movement.X * movement.X + movement.Z * movement.Z > threshold * threshold;
+        }
+
+        public bool PlayerJumped()
+        {
+            return IsPlayerJumping != null
+                && IsPlayerJumping.Changed
+                && IsPlayerJumping.New;
+        }
+
+        public bool PDAOpenedOrClosed()
+        {
+            return PDAIsInUse != null && PDAIsInUse.Changed;
         }
 
         public bool BuilderMenuOpened()
@@ -811,24 +824,26 @@ namespace LiveSplit.BelowZero
                 || string.Equals(ActiveToolName.Old, TechType.Builder.ToString(), StringComparison.OrdinalIgnoreCase);
         }
 
-        public bool PickedUpSnowball()
+        public bool CraftingMenuOpened()
         {
-            if (!currentInventoryChanges.TryGetValue(TechType.SnowBall, out int delta) || delta != 1)
-                return false;
-
-            if (currentInventoryChanges.Count != 1)
-                return false;
-
-            if ((PlayerIsUnderwater?.New ?? false) || (PlayerIsInside?.New ?? false))
-                return false;
-
-            if (GuiHandActiveTarget != null && GuiHandActiveTarget.New != IntPtr.Zero)
-                return false;
-
-            return true;
+            return CraftingMenu != null
+                && CraftingMenu.New != IntPtr.Zero
+                && CraftingMenu.Old == IntPtr.Zero;
         }
 
-        private bool HasPlayerItem(TechType techType) => PlayerInventory.ContainsKey(techType) || PlayerEquipment.Contains(techType);
+        public bool PickedUpSnowball()
+        {
+            return currentInventoryChanges.TryGetValue(TechType.SnowBall, out int delta) && delta > 0;
+        }
+
+        private bool PlayerHasItem(TechType techType) => PlayerInventory.ContainsKey(techType) || PlayerEquipment.Contains(techType);
+
+        private bool PlayerHasItems(params TechType[] techTypes)
+        {
+            return techTypes != null
+                && techTypes.Length > 0
+                && techTypes.All(PlayerHasItem);
+        }
 
         private int GetPlayerItemCount(TechType techType) => PlayerInventory.GetCount(techType) + PlayerEquipment.Count(item => item == techType);
 
@@ -891,6 +906,11 @@ namespace LiveSplit.BelowZero
                 && newlyCompletedStoryGoals.Contains(goal.ToString());
         }
 
+        public bool IntroCompleted()
+        {
+            return CompletedStoryGoal(StoryGoal.IntroComplete);
+        }
+
         private bool HasNotCompletedStoryGoal(StoryGoal goal)
         {
             return storyGoalsInitialized
@@ -945,6 +965,28 @@ namespace LiveSplit.BelowZero
                 || (DeathScreenActive.New && !DeathScreenActive.Old);
         }
 
+        private bool IsAnimationPlaying()
+        {
+            return AnimationPlaying != null
+                && AnimationPlaying.Changed
+                && AnimationPlaying.New
+                && !AnimationPlaying.Old;
+        }
+
+        private bool IsAnimationEnding()
+        {
+            return AnimationPlaying != null
+                && AnimationPlaying.Changed
+                && !AnimationPlaying.New
+                && AnimationPlaying.Old;
+        }
+
+        private bool IsInventoryFull()
+        {
+            return playerInventorySlotsUsed == inventoryCapacitySlots
+                && playerInventorySlotsUsedOld != inventoryCapacitySlots;
+        }
+
         private bool IsInsideBiome(Biome biome)
         {
             return BiomeMatches(BiomeString.New, biome);
@@ -978,6 +1020,32 @@ namespace LiveSplit.BelowZero
                 && IsInsideBiome(destinationBiome);
         }
 
+        private bool IsWithinBounds(float[] bounds, bool old = false)
+        {
+            if (bounds == null || bounds.Length < 6)
+                return false;
+
+            bool hasManagedPosition = PlayerLastPositionX != null
+                && PlayerLastPositionY != null
+                && PlayerLastPositionZ != null;
+
+            Pointer<float> positionX = hasManagedPosition ? PlayerLastPositionX : DirectPositionX;
+            Pointer<float> positionY = hasManagedPosition ? PlayerLastPositionY : DirectPositionY;
+            Pointer<float> positionZ = hasManagedPosition ? PlayerLastPositionZ : DirectPositionZ;
+            if (positionX == null || positionY == null || positionZ == null)
+                return false;
+
+            float x = old ? positionX.Old : positionX.New;
+            float y = old ? positionY.Old : positionY.New;
+            float z = old ? positionZ.Old : positionZ.New;
+            if (float.IsNaN(x) || float.IsNaN(y) || float.IsNaN(z))
+                return false;
+
+            return x >= Math.Min(bounds[0], bounds[1]) && x <= Math.Max(bounds[0], bounds[1])
+                && y >= Math.Min(bounds[2], bounds[3]) && y <= Math.Max(bounds[2], bounds[3])
+                && z >= Math.Min(bounds[4], bounds[5]) && z <= Math.Max(bounds[4], bounds[5]);
+        }
+
         private static bool BiomeMatches(string currentBiome, Biome expectedBiome)
         {
             return expectedBiome != Biome.None
@@ -999,11 +1067,13 @@ namespace LiveSplit.BelowZero
                     && !KnownTechOld.Contains(techType));
         }
 
-        private bool InventoryItemRemovedOutsidePDA(TechType techType, string displayName)
+        private bool InventoryItemRemovedOutsidePDA(TechType techType)
         {
             bool itemDropped = currentInventoryChanges.TryGetValue(techType, out int delta) && delta < 0;
             if (!itemDropped)
                 return false;
+
+            string displayName = Localization.GetDisplayName(techType);
 
             if (IsPDAInventoryOpen())
             {
@@ -1219,11 +1289,8 @@ namespace LiveSplit.BelowZero
                     return true;
             }
 
-            if (IsAnimationPlaying != null && IsAnimationPlaying.Changed)
-            {
-                if (IsAnimationPlaying.New && !IsAnimationPlaying.Old)
-                    return true;
-            }
+            if (IsAnimationPlaying())
+                return true;
 
             if (PlayerControllerInputEnabled != null && PlayerControllerInputEnabled.Changed)
             {
@@ -1242,7 +1309,7 @@ namespace LiveSplit.BelowZero
             if (IsLoadingScreenShowing?.New ?? false)
                 return false;
 
-            if (IsAnimationPlaying?.New ?? false)
+            if (AnimationPlaying?.New ?? false)
                 return false;
 
             if (PlayerControllerInputEnabled != null && !PlayerControllerInputEnabled.New)
@@ -1310,10 +1377,9 @@ namespace LiveSplit.BelowZero
                 craftCounts[pair.Key] = pair.Value;
         }
 
-        public void ResetRunState(bool armHeldMovementStartAfterReset = false)
+        public void ResetRunState()
         {
             startedTimerBefore = false;
-            MovementStartArmed = armHeldMovementStartAfterReset;
             inventoryInitialized = false;
             blueprintsInitialized = false;
             encyclopediaInitialized = false;
@@ -1358,7 +1424,7 @@ namespace LiveSplit.BelowZero
                 Pointer<bool> animationPointer = MakeModulePointer<bool>("mono-2.0-bdwgc.dll", 0x499C78, 0x40, 0xF0, 0x28, 0x260, 0xA8);
                 if (animationPointer != null)
                 {
-                    IsAnimationPlaying = animationPointer;
+                    AnimationPlaying = animationPointer;
                     logger.Log("Using direct Below Zero animation pointer.");
                 }
             }
@@ -1428,44 +1494,15 @@ namespace LiveSplit.BelowZero
             return factory.Make<T>(module.BaseAddress + moduleOffset, offsets);
         }
 
-        public bool IsMovementInputActive(float threshold = 0.001f)
+        // These fields are populated directly by the process-memory reader.
+#pragma warning disable CS0649
+        private struct MovementVector
         {
-            return IsAxisActive(MoveDirectionX, threshold) || IsAxisActive(MoveDirectionZ, threshold);
+            public float X;
+            public float Y;
+            public float Z;
         }
-
-        private static bool BecameActive(Pointer<float> axis, float threshold)
-        {
-            if (axis == null)
-                return false;
-
-            return Math.Abs(axis.New) > threshold && Math.Abs(axis.Old) <= threshold;
-        }
-
-        private static bool IsHorizontallyActive(Pointer<float> x, Pointer<float> z, float threshold)
-        {
-            if (x == null || z == null)
-                return false;
-
-            return Math.Sqrt(x.New * x.New + z.New * z.New) > threshold;
-        }
-
-        private static bool BecameHorizontallyActive(Pointer<float> x, Pointer<float> z, float threshold)
-        {
-            if (x == null || z == null)
-                return false;
-
-            double oldMagnitude = Math.Sqrt(x.Old * x.Old + z.Old * z.Old);
-            double newMagnitude = Math.Sqrt(x.New * x.New + z.New * z.New);
-            return oldMagnitude <= threshold && newMagnitude > threshold;
-        }
-
-        private static bool IsAxisActive(Pointer<float> axis, float threshold)
-        {
-            if (axis == null)
-                return false;
-
-            return Math.Abs(axis.New) > threshold;
-        }
+#pragma warning restore CS0649
 
         private void ResolveUnityObjectCachedPtrOffset(UnityHelperTask.UnityHelperBase unity)
         {

@@ -91,9 +91,9 @@ namespace LiveSplit.BelowZero
             if (IsLoading)
                 return;
 
-            StartEnabled = chkIntroStart.Checked;
-            IntroStart = StartEnabled;
-            CreativeStart = StartEnabled;
+            IntroStart = chkIntroStart.Checked;
+            CreativeStart = chkCreativeStart.Checked;
+            StartEnabled = IntroStart || CreativeStart;
             Reset = chkReset.Checked;
             AskForGoldSave = chkAskForGoldSave.Checked;
             OrderedLiveSplit = cbOrderedLiveSplit.Checked;
@@ -104,11 +104,13 @@ namespace LiveSplit.BelowZero
 
         public XmlNode UpdateSettings(XmlDocument document)
         {
+            UpdateSplits();
+
             XmlElement xmlSettings = document.CreateElement("Settings");
 
             AddBool(document, xmlSettings, "StartEnabled", StartEnabled);
-            AddBool(document, xmlSettings, "IntroStart", StartEnabled);
-            AddBool(document, xmlSettings, "CreativeStart", StartEnabled);
+            AddBool(document, xmlSettings, "IntroStart", IntroStart);
+            AddBool(document, xmlSettings, "CreativeStart", CreativeStart);
             AddBool(document, xmlSettings, "Reset", Reset);
             AddBool(document, xmlSettings, "AskForGoldSave", AskForGoldSave);
             AddBool(document, xmlSettings, "OrderedLiveSplit", OrderedLiveSplit);
@@ -116,8 +118,6 @@ namespace LiveSplit.BelowZero
 
             XmlElement xmlSplits = document.CreateElement("Splits");
             xmlSettings.AppendChild(xmlSplits);
-
-            UpdateSplits();
 
             foreach (var split in Splits)
             {
@@ -143,6 +143,9 @@ namespace LiveSplit.BelowZero
 
             switch (split)
             {
+                case ArtifactSplit artifactSplit:
+                    xmlValue.InnerText = artifactSplit.Artifact.ToString();
+                    break;
                 case ItemSplit itemSplit:
                     xmlValue.InnerText = $"{itemSplit.Item}:{itemSplit.PickUp}:{itemSplit.IsCount}:{itemSplit.Count}";
                     break;
@@ -189,9 +192,10 @@ namespace LiveSplit.BelowZero
                 XmlNode splitsNode = settings.SelectSingleNode(".//Splits");
                 if (splitsNode != null)
                 {
-                    StartEnabled = ReadBool(settings, "StartEnabled", ReadBool(settings, "IntroStart") || ReadBool(settings, "CreativeStart"));
-                    IntroStart = StartEnabled;
-                    CreativeStart = StartEnabled;
+                    bool legacyStartEnabled = ReadBool(settings, "StartEnabled", true);
+                    IntroStart = ReadBool(settings, "IntroStart", legacyStartEnabled);
+                    CreativeStart = ReadBool(settings, "CreativeStart", legacyStartEnabled);
+                    StartEnabled = IntroStart || CreativeStart;
                     Reset = ReadBool(settings, "Reset");
                     AskForGoldSave = ReadBool(settings, "AskForGoldSave");
                     OrderedLiveSplit = ReadBool(settings, "OrderedLiveSplit");
@@ -256,6 +260,12 @@ namespace LiveSplit.BelowZero
                     split = new EncyclopediaSplit(encyEntry, onlySplitOnce, isSubCondition);
                     break;
 
+                case SplitName.Artifact:
+                    if (!Enum.TryParse(value, ignoreCase: true, out Artifact artifact))
+                        return null;
+                    split = new ArtifactSplit(artifact, onlySplitOnce, isSubCondition);
+                    break;
+
                 case SplitName.Biome:
                     if (values.Length >= 2)
                     {
@@ -299,8 +309,8 @@ namespace LiveSplit.BelowZero
         public override void LoadSettings()
         {
             IsLoading = true;
-            chkIntroStart.Checked = StartEnabled;
-            chkCreativeStart.Checked = StartEnabled;
+            chkIntroStart.Checked = IntroStart;
+            chkCreativeStart.Checked = CreativeStart;
             chkReset.Checked = Reset;
             chkAskForGoldSave.Checked = AskForGoldSave;
             cbOrderedLiveSplit.Checked = OrderedLiveSplit;

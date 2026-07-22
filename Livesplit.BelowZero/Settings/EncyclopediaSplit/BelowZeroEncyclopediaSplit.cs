@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Linq;
 using System.Windows.Forms;
+using Voxif.AutoSplitter;
 
 namespace LiveSplit.BelowZero
 {
@@ -21,6 +22,7 @@ namespace LiveSplit.BelowZero
             InitializeComponent();
 
             _split = encySplit ?? new EncyclopediaSplit(EncyclopediaEntry.None, onlySplitOnce: true, isSubCondition: false);
+            l_name.Text = _split is ArtifactSplit ? "Artifacts" : "Encyclopedia";
 
             cboEncy.DropDownStyle = ComboBoxStyle.DropDownList;
             cboEncy.MouseWheel += (o, e) => ((HandledMouseEventArgs)e).Handled = true;
@@ -45,7 +47,9 @@ namespace LiveSplit.BelowZero
             if (IsLoading)
                 return;
 
-            if (cboEncy.SelectedValue is EncyclopediaEntry entry)
+            if (_split is ArtifactSplit artifactSplit && cboEncy.SelectedValue is Artifact artifact)
+                artifactSplit.Artifact = artifact;
+            else if (cboEncy.SelectedValue is EncyclopediaEntry entry)
                 _split.Entry = entry;
         }
 
@@ -77,7 +81,7 @@ namespace LiveSplit.BelowZero
         public override ComboBox ComboBox => this.cboEncy;
         public override Button BtnEdit => this.btnEdit;
         public override Button BtnRemove => this.btnRemove;
-        public override SplitName SplitName => SplitName.Encyclopedia;
+        public override SplitName SplitName => _split.SplitName;
         public override BelowZeroSplit Split => this._split;
     }
 
@@ -93,6 +97,30 @@ namespace LiveSplit.BelowZero
             this.IsSubCondition = isSubCondition;
         }
         public override string GetDescription() => $"{Localization.GetDisplayName(Entry)} in Encyclopedia Split";
+    }
+
+    public class ArtifactSplit : EncyclopediaSplit
+    {
+        private Artifact artifact;
+
+        public Artifact Artifact
+        {
+            get => artifact;
+            set
+            {
+                artifact = value;
+                Entry = value.ConvertTo<EncyclopediaEntry>();
+            }
+        }
+
+        public ArtifactSplit(Artifact artifact, bool onlySplitOnce, bool isSubCondition)
+            : base(artifact.ConvertTo<EncyclopediaEntry>(), onlySplitOnce, isSubCondition)
+        {
+            Artifact = artifact;
+            SplitName = SplitName.Artifact;
+        }
+
+        public override string GetDescription() => $"Scan {Localization.GetDisplayName(Artifact)}";
     }
 }
 

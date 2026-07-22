@@ -117,12 +117,18 @@ namespace LiveSplit.BelowZero
         Blueprint,
         [Description("Encyclopedia"), ToolTip("Splits when you unlock a certain encyclopedia entry")]
         Encyclopedia,
+        [Description("Artifacts"), ToolTip("Splits when you scan a certain Architect Artifact")]
+        Artifact,
         [Description("Biome"), ToolTip("Splits when you enter a biome or move between biomes")]
         Biome,
         [Description("Craft"), ToolTip("Splits when you start crafting a certain item")]
         Craft,
         [Description("Build"), ToolTip("Splits when you complete building a certain builder tool base piece or placeable")]
         Build,
+        [Description("Enter Base"), ToolTip("Splits when you enter a player-built base")]
+        EnterBaseSplit,
+        [Description("Exit Base"), ToolTip("Splits when you exit a player-built base")]
+        ExitBaseSplit,
         [Description("Full Inventory"), ToolTip("Splits when you have a full inventory")]
         FullInventorySplit,
         [Description("Throw Flare"), ToolTip("Splits when you throw a flare")]
@@ -167,6 +173,10 @@ namespace LiveSplit.BelowZero
         BraceSplit,
         [Description("Insert Hydraulics Fluid"), ToolTip("Splits when you Insert Hydraulics Fluid into the Bridge Controls in the Glacial Bay")]
         InsertHydraulicsFluidSplit,
+        //[Description("Insert Test Overide Module"), ToolTip("Splits when you Insert the Test Override Module into the Radio Tower")]
+        //InsertTestOverrideModuleSplit,
+        [Description("Cure Frozen Leviathan"), ToolTip("Splits when you Insert the Antidote into the Machine inside the Frozen Leviathan Cave to Cure")]
+        CureFrozenLeviathanSplit,
     }
     public class ToolTipAttribute : Attribute
     {
