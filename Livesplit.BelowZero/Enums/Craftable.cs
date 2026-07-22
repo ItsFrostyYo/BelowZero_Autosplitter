@@ -229,7 +229,7 @@ namespace LiveSplit.BelowZero
         RocketBaseLadder = 5901,
         Exchanger = 8000,
         ReinforcedGlass = 8003,
-        PrecursorNPCBody = 8012,
+        // TechType 8012 is intentionally omitted because the fabricated AL-AN body is not directly accessible in-game.
         PrecursorNPCOrgans = 8014,
         PrecursorNPCTissue = 8015,
         PrecursorNPCSkeleton = 8016,

@@ -1457,7 +1457,6 @@ namespace LiveSplit.BelowZero
     	SupplyDrop = 8010,
     	[Obsolete]
     	PrecursorFabricator = 8011,
-    	PrecursorNPCBody = 8012,
     	[Obsolete]
     	PrecursorNPCPowerSource = 8013,
     	PrecursorNPCOrgans = 8014,

@@ -223,6 +223,9 @@ namespace Voxif.Helpers.Unity {
             protected virtual string ClassName(IntPtr klass) {
                 return GetName(klass + data.GetOffset("MonoClass", "name"));
             }
+            public string GetClassName(IntPtr klass) {
+                return ClassName(klass);
+            }
             protected virtual string ClassNamespace(IntPtr klass) {
                 return GetName(klass + data.GetOffset("MonoClass", "name_space"));
             }
@@ -714,6 +717,7 @@ namespace Voxif.Helpers.Unity {
         
         IntPtr FindClass(string classToFind);
         IntPtr FindClass(string classToFind, IntPtr image);
+        string GetClassName(IntPtr klass);
 
         IntPtr GetStaticField(IntPtr image, string className, string fieldName, out IntPtr klass, out int staticOffset, bool includeParents = true);
         IntPtr GetStaticField(IntPtr klass, string fieldName, out int staticOffset, bool includeParents = true);

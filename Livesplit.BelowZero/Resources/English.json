@@ -1342,7 +1342,6 @@
     "Tooltip_PrecursorNPCSkeleton"                                : "The skeletal structure of an Architect vessel",
     "PrecursorNPCTissue"                                          : "Architect Tissues",
     "Tooltip_PrecursorNPCTissue"                                  : "The tissues of an Architect vessel",
-    "PrecursorNPCBody"                                            : "AL-AN",
     "PrecursorInteract"                                           : "Talk to AL-AN",
     "PrecursorTechGeneric"                                        : "Architect Artifact",
     "PrecursorTeleporter"                                         : "Architect Teleporter",

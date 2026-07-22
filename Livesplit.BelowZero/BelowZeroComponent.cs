@@ -20,7 +20,7 @@ namespace LiveSplit.BelowZero
         private readonly TimerModel timerModel;
         private string lastUpdateState = string.Empty;
         private string lastOrderedSplitDescription = string.Empty;
-        public readonly HashSet<BelowZeroSplit> alreadySplit = new HashSet<BelowZeroSplit>();
+        private readonly HashSet<BelowZeroSplit> alreadySplit = new HashSet<BelowZeroSplit>();
 
         public BelowZeroComponent(LiveSplitState state) : base(state)
         {
@@ -40,7 +40,7 @@ namespace LiveSplit.BelowZero
             Localization.Load();
             _state = state;
             settings = new BelowZeroSettings(state);
-            memory = new BelowZeroMemory(state, this, logger, settings);
+            memory = new BelowZeroMemory(logger, settings);
             timerModel = new TimerModel() { CurrentState = state };
         }
 
@@ -97,7 +97,7 @@ namespace LiveSplit.BelowZero
             if (memory.IsLoadingScreenShowing?.New ?? false)
                 return true;
 
-            if (memory.IsIntroCinematicPlaying())
+            if (memory.IsIntroCinematicActive?.New ?? false)
                 return true;
 
             return (PDATab)memory.PDATab.New == PDATab.Intro;
@@ -111,7 +111,7 @@ namespace LiveSplit.BelowZero
             if (!(memory.PlayerControllerInputEnabled?.New ?? true))
                 return false;
 
-            if (memory.IsIntroCinematicPlaying())
+            if (memory.IsIntroCinematicActive?.New ?? false)
                 return false;
 
             if (memory.IsLoadingScreenShowing?.New ?? false)
@@ -243,7 +243,6 @@ namespace LiveSplit.BelowZero
 
         public override bool Split()
         {
-            // TODO: fix only split once shit
             if (!memory.pointersInitialized)
                 return false;
 
@@ -298,7 +297,7 @@ namespace LiveSplit.BelowZero
             }
         }
 
-        public override bool Loading() => memory.ShouldPause();
+        public override bool Loading() => false;
 
         private void TryResetOnMainMenu()
         {

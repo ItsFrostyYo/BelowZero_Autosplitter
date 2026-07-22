@@ -4,10 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using Voxif.AutoSplitter;
 
@@ -21,7 +17,7 @@ namespace LiveSplit.BelowZero
 
         public List<BelowZeroSplit> Splits { get; set; }
         public virtual RadioButton Alpha { get; set; }
-        public GameVersion CurrentGameVersion { get; private set; } = BelowZeroVersionedData.ActiveVersion;
+        private GameVersion currentGameVersion = GameVersion.Oct2025;
 
 
         public LiveSplitState State;
@@ -91,7 +87,7 @@ namespace LiveSplit.BelowZero
 
         private void EnableEdit(BelowZeroSplitSetting setting)
         {
-            setting.BtnEdit.Text = "✔";
+            setting.BtnEdit.Text = ConfirmEditGlyph;
             ApplyDataSources(setting, Alpha.Checked);
             setting.ComboBox.Enabled = true;
             if (setting.ComboBox2 != null)
@@ -100,7 +96,7 @@ namespace LiveSplit.BelowZero
 
         private void DisableEdit(BelowZeroSplitSetting setting)
         {
-            setting.BtnEdit.Text = "✏";
+            setting.BtnEdit.Text = EditButtonGlyph;
             setting.ComboBox.Enabled = false;
             if (setting.ComboBox2 != null)
                 setting.ComboBox2.Enabled = false;
@@ -119,7 +115,124 @@ namespace LiveSplit.BelowZero
                     Splits.Add(setting.Split);
         }
 
+        private static List<ComboItem<TEnum>> BuildEnumList<TEnum>(int skip, Func<TEnum, bool> include = null) where TEnum : struct
+        {
+            return Enum.GetValues(typeof(TEnum))
+                .Cast<TEnum>()
+                .Skip(skip)
+                .Where(value => include == null || include(value))
+                .Select(value => new ComboItem<TEnum>
+                {
+                    Value = value,
+                    Display = typeof(TEnum) == typeof(Biome)
+                        ? value.ToString()
+                        : Localization.GetDisplayName(value),
+                })
+                .ToList();
+        }
+
         private static readonly StringComparer AlphaComparer = StringComparer.OrdinalIgnoreCase;
+
+        private static readonly HashSet<Craftable> BuilderBuildables = new HashSet<Craftable>
+        {
+            Craftable.Workbench,
+            Craftable.Fabricator,
+            Craftable.Aquarium,
+            Craftable.Locker,
+            Craftable.Spotlight,
+            Craftable.CurrentGenerator,
+            Craftable.SolarPanel,
+            Craftable.Sign,
+            Craftable.PowerTransmitter,
+            Craftable.ThermalPlant,
+            Craftable.SmallLocker,
+            Craftable.Bench,
+            Craftable.PictureFrame,
+            Craftable.PlanterPot,
+            Craftable.PlanterBox,
+            Craftable.PlanterShelf,
+            Craftable.FarmingTray,
+            Craftable.FiltrationMachine,
+            Craftable.Techlight,
+            Craftable.PlanterPot2,
+            Craftable.PlanterPot3,
+            Craftable.SingleWallShelf,
+            Craftable.WallShelves,
+            Craftable.Bed1,
+            Craftable.Bed2,
+            Craftable.NarrowBed,
+            Craftable.BatteryCharger,
+            Craftable.PowerCellCharger,
+            Craftable.BaseColorCustomizer,
+            Craftable.Jukebox,
+            Craftable.Speaker,
+            Craftable.QuantumLocker,
+            Craftable.Recyclotron,
+            Craftable.StarshipDesk,
+            Craftable.StarshipChair,
+            Craftable.StarshipChair2,
+            Craftable.StarshipChair3,
+            Craftable.CoffeeVendingMachine,
+            Craftable.BarTable,
+            Craftable.Trashcans,
+            Craftable.LabTrashcan,
+            Craftable.VendingMachine,
+            Craftable.LabCounter,
+            Craftable.Snowman,
+            Craftable.Fridge,
+            Craftable.Shower,
+            Craftable.Sink,
+            Craftable.SmallStove,
+            Craftable.Toilet,
+            Craftable.EmmanuelPendulum,
+            Craftable.AromatherapyLamp,
+            Craftable.BedDanielle,
+            Craftable.BedEmmanuel,
+            Craftable.BedFred,
+            Craftable.BedJeremiah,
+            Craftable.BedSam,
+            Craftable.BedZeta,
+            Craftable.ExecutiveDesk,
+            Craftable.BedParvan,
+            Craftable.BaseRoom,
+            Craftable.BaseHatch,
+            Craftable.BaseWall,
+            Craftable.BaseDoor,
+            Craftable.BaseLadder,
+            Craftable.BaseWindow,
+            Craftable.BaseCorridor,
+            Craftable.BaseFoundation,
+            Craftable.BaseCorridorI,
+            Craftable.BaseCorridorL,
+            Craftable.BaseCorridorT,
+            Craftable.BaseCorridorX,
+            Craftable.BaseReinforcement,
+            Craftable.BaseBulkhead,
+            Craftable.BaseCorridorGlassI,
+            Craftable.BaseCorridorGlassL,
+            Craftable.BaseObservatory,
+            Craftable.BaseConnector,
+            Craftable.BaseMoonpool,
+            Craftable.BaseCorridorGlass,
+            Craftable.BaseUpgradeConsole,
+            Craftable.BasePlanter,
+            Craftable.BaseFiltrationMachine,
+            Craftable.BaseWaterPark,
+            Craftable.BaseMapRoom,
+            Craftable.BaseBioReactor,
+            Craftable.BaseNuclearReactor,
+            Craftable.BasePipeConnector,
+            Craftable.BaseRechargePlatform,
+            Craftable.BaseControlRoom,
+            Craftable.BaseWallFoundation,
+            Craftable.BaseLargeRoom,
+            Craftable.BasePartitionDoor,
+            Craftable.BaseGlassDome,
+            Craftable.BasePartition,
+            Craftable.BaseLargeGlassDome,
+            Craftable.Hoverpad,
+            Craftable.BaseMoonpoolExpansion,
+        };
 
         public static readonly Lazy<IReadOnlyList<ComboItem<SplitName>>> Prefabs =
             new Lazy<IReadOnlyList<ComboItem<SplitName>>>(() =>
@@ -154,6 +267,60 @@ namespace LiveSplit.BelowZero
         public static readonly Lazy<IReadOnlyList<ComboItem<SplitName>>> PrefabAlpha =
             new Lazy<IReadOnlyList<ComboItem<SplitName>>>(() => Prefabs.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
 
+        private static readonly Lazy<IReadOnlyList<ComboItem<InventoryItem>>> Items =
+            new Lazy<IReadOnlyList<ComboItem<InventoryItem>>>(() => BuildEnumList<InventoryItem>(1));
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Unlockable>>> Blueprints =
+            new Lazy<IReadOnlyList<ComboItem<Unlockable>>>(() => BuildEnumList<Unlockable>(1));
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<EncyclopediaEntry>>> EncyclopediaEntries =
+            new Lazy<IReadOnlyList<ComboItem<EncyclopediaEntry>>>(() => BuildEnumList<EncyclopediaEntry>(1));
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Biome>>> Biomes =
+            new Lazy<IReadOnlyList<ComboItem<Biome>>>(() => BuildEnumList<Biome>(1));
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Craftable>>> Craftables =
+            new Lazy<IReadOnlyList<ComboItem<Craftable>>>(() => BuildEnumList<Craftable>(1, value => !BuilderBuildables.Contains(value)));
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Craftable>>> Buildables =
+            new Lazy<IReadOnlyList<ComboItem<Craftable>>>(() => BuildEnumList<Craftable>(1, BuilderBuildables.Contains));
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<InventoryItem>>> ItemsAlpha =
+            new Lazy<IReadOnlyList<ComboItem<InventoryItem>>>(() => Items.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Unlockable>>> BlueprintsAlpha =
+            new Lazy<IReadOnlyList<ComboItem<Unlockable>>>(() => Blueprints.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<EncyclopediaEntry>>> EncyclopediaEntriesAlpha =
+            new Lazy<IReadOnlyList<ComboItem<EncyclopediaEntry>>>(() => EncyclopediaEntries.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Biome>>> BiomesAlpha =
+            new Lazy<IReadOnlyList<ComboItem<Biome>>>(() => Biomes.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Craftable>>> CraftablesAlpha =
+            new Lazy<IReadOnlyList<ComboItem<Craftable>>>(() => Craftables.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private static readonly Lazy<IReadOnlyList<ComboItem<Craftable>>> BuildablesAlpha =
+            new Lazy<IReadOnlyList<ComboItem<Craftable>>>(() => Buildables.Value.OrderBy(x => x.Display ?? string.Empty, AlphaComparer).ToList());
+
+        private IReadOnlyList<ComboItem<TEnum>> ForCurrentVersion<TEnum>(
+            IReadOnlyList<ComboItem<TEnum>> values,
+            Func<TEnum, bool> availableInAug2021)
+        {
+            return currentGameVersion == GameVersion.Aug2021
+                ? values.Where(item => availableInAug2021(item.Value)).ToList()
+                : values;
+        }
+
+        private IReadOnlyList<ComboItem<Unlockable>> GetBlueprints(bool alpha) =>
+            ForCurrentVersion(alpha ? BlueprintsAlpha.Value : Blueprints.Value, value => value != Unlockable.BaseMoonpoolExpansion);
+
+        private IReadOnlyList<ComboItem<EncyclopediaEntry>> GetEncyclopediaEntries(bool alpha) =>
+            ForCurrentVersion(alpha ? EncyclopediaEntriesAlpha.Value : EncyclopediaEntries.Value, value => value != EncyclopediaEntry.MoonpoolExpansion);
+
+        private IReadOnlyList<ComboItem<Craftable>> GetBuildables(bool alpha) =>
+            ForCurrentVersion(alpha ? BuildablesAlpha.Value : Buildables.Value, value => value != Craftable.BaseMoonpoolExpansion);
+
         public void AddHandlers(BelowZeroSplitSetting setting)
         {
             setting.ComboBox.SelectedIndexChanged += new EventHandler(ControlChanged);
@@ -184,7 +351,7 @@ namespace LiveSplit.BelowZero
             }
         }
 
-        public virtual void SetGameVersion(GameVersion version)
+        internal void SetGameVersion(GameVersion version)
         {
             if (IsDisposed || Disposing)
                 return;
@@ -201,8 +368,7 @@ namespace LiveSplit.BelowZero
                 return;
             }
 
-            BelowZeroVersionedData.SetActiveVersion(version);
-            CurrentGameVersion = BelowZeroVersionedData.ActiveVersion;
+            currentGameVersion = version;
 
             if (MainPanel == null || Alpha == null || MainPanel.Controls.Count == 0)
                 return;
@@ -224,23 +390,23 @@ namespace LiveSplit.BelowZero
             switch (setting)
             {
                 case BelowZeroItemSplit _:
-                    BindCombo(setting.ComboBox, BelowZeroVersionedData.GetItems(CurrentGameVersion, alpha), setting.ComboBox.SelectedValue, alpha);
+                    BindCombo(setting.ComboBox, alpha ? ItemsAlpha.Value : Items.Value, setting.ComboBox.SelectedValue, alpha);
                     break;
                 case BelowZeroBlueprintSplit _:
-                    BindCombo(setting.ComboBox, BelowZeroVersionedData.GetBlueprints(CurrentGameVersion, alpha), setting.ComboBox.SelectedValue, alpha);
+                    BindCombo(setting.ComboBox, GetBlueprints(alpha), setting.ComboBox.SelectedValue, alpha);
                     break;
                 case BelowZeroEncyclopediaSplit _:
-                    BindCombo(setting.ComboBox, BelowZeroVersionedData.GetEncyclopediaEntries(CurrentGameVersion, alpha), setting.ComboBox.SelectedValue, alpha);
+                    BindCombo(setting.ComboBox, GetEncyclopediaEntries(alpha), setting.ComboBox.SelectedValue, alpha);
                     break;
                 case BelowZeroBiomeSplit _:
-                    BindCombo(setting.ComboBox, BelowZeroVersionedData.GetBiomes(CurrentGameVersion, alpha), setting.ComboBox.SelectedValue, alpha);
-                    BindCombo(setting.ComboBox2, BelowZeroVersionedData.GetBiomes(CurrentGameVersion, alpha), setting.ComboBox2.SelectedValue ?? setting.ComboBox.SelectedValue, alpha);
+                    BindCombo(setting.ComboBox, alpha ? BiomesAlpha.Value : Biomes.Value, setting.ComboBox.SelectedValue, alpha);
+                    BindCombo(setting.ComboBox2, alpha ? BiomesAlpha.Value : Biomes.Value, setting.ComboBox2.SelectedValue ?? setting.ComboBox.SelectedValue, alpha);
                     break;
                 case BelowZeroCraftSplit craftSetting when craftSetting.Split is BuildSplit:
-                    BindCombo(setting.ComboBox, BelowZeroVersionedData.GetBuildables(CurrentGameVersion, alpha), setting.ComboBox.SelectedValue, alpha);
+                    BindCombo(setting.ComboBox, GetBuildables(alpha), setting.ComboBox.SelectedValue, alpha);
                     break;
                 case BelowZeroCraftSplit _:
-                    BindCombo(setting.ComboBox, BelowZeroVersionedData.GetCraftables(CurrentGameVersion, alpha), setting.ComboBox.SelectedValue, alpha);
+                    BindCombo(setting.ComboBox, alpha ? CraftablesAlpha.Value : Craftables.Value, setting.ComboBox.SelectedValue, alpha);
                     break;
                 default:
                     BindCombo(setting.ComboBox, alpha ? PrefabAlpha.Value : Prefabs.Value, setting.ComboBox.SelectedValue, alpha);
@@ -264,9 +430,7 @@ namespace LiveSplit.BelowZero
 
             setting.IsSubCondition = isSubCondition;            
             setting.Split.IsSubCondition = isSubCondition;            
-            setting.BtnEdit.Text = "✔";
             AddHandlers(setting);
-            setting.BtnEdit.Text = "\u2714";
             return setting;
         }
 
@@ -285,26 +449,24 @@ namespace LiveSplit.BelowZero
 
             setting.IsSubCondition = isSubCondition;
             setting.Split.IsSubCondition = isSubCondition;
-            setting.BtnEdit.Text = "âœ”";
             AddHandlers(setting);
             return setting;
         }
 
         public BelowZeroPrefabSplit CreatePrefabSplit(bool isSubCondition) => CreateSplit<BelowZeroPrefabSplit, SplitName>(Alpha.Checked ? PrefabAlpha.Value : Prefabs.Value, s => s.cboName, isSubCondition);
-        public BelowZeroItemSplit CreateItemSplit(bool isSubCondition) => CreateSplit<BelowZeroItemSplit, InventoryItem>(BelowZeroVersionedData.GetItems(CurrentGameVersion, Alpha.Checked), s => s.cboItem, isSubCondition);
-        public BelowZeroBlueprintSplit CreateBlueprintSplit(bool isSubCondition) => CreateSplit<BelowZeroBlueprintSplit, Unlockable>(BelowZeroVersionedData.GetBlueprints(CurrentGameVersion, Alpha.Checked), s => s.cboBlueprint, isSubCondition);
-        public BelowZeroEncyclopediaSplit CreateEncyclopediaSplit(bool isSubCondition) => CreateSplit<BelowZeroEncyclopediaSplit, EncyclopediaEntry>(BelowZeroVersionedData.GetEncyclopediaEntries(CurrentGameVersion, Alpha.Checked), s => s.cboEncy, isSubCondition);
-        public BelowZeroCraftSplit CreateCraftSplit(bool isSubCondition) => CreateCraftableSplit(new CraftSplit(Craftable.None, onlySplitOnce: true, isSubCondition: false), BelowZeroVersionedData.GetCraftables(CurrentGameVersion, Alpha.Checked), isSubCondition);
-        public BelowZeroCraftSplit CreateBuildSplit(bool isSubCondition) => CreateCraftableSplit(new BuildSplit(Craftable.None, onlySplitOnce: true, isSubCondition: false), BelowZeroVersionedData.GetBuildables(CurrentGameVersion, Alpha.Checked), isSubCondition);
+        public BelowZeroItemSplit CreateItemSplit(bool isSubCondition) => CreateSplit<BelowZeroItemSplit, InventoryItem>(Alpha.Checked ? ItemsAlpha.Value : Items.Value, s => s.cboItem, isSubCondition);
+        public BelowZeroBlueprintSplit CreateBlueprintSplit(bool isSubCondition) => CreateSplit<BelowZeroBlueprintSplit, Unlockable>(GetBlueprints(Alpha.Checked), s => s.cboBlueprint, isSubCondition);
+        public BelowZeroEncyclopediaSplit CreateEncyclopediaSplit(bool isSubCondition) => CreateSplit<BelowZeroEncyclopediaSplit, EncyclopediaEntry>(GetEncyclopediaEntries(Alpha.Checked), s => s.cboEncy, isSubCondition);
+        public BelowZeroCraftSplit CreateCraftSplit(bool isSubCondition) => CreateCraftableSplit(new CraftSplit(Craftable.None, onlySplitOnce: true, isSubCondition: false), Alpha.Checked ? CraftablesAlpha.Value : Craftables.Value, isSubCondition);
+        public BelowZeroCraftSplit CreateBuildSplit(bool isSubCondition) => CreateCraftableSplit(new BuildSplit(Craftable.None, onlySplitOnce: true, isSubCondition: false), GetBuildables(Alpha.Checked), isSubCondition);
         public BelowZeroBiomeSplit CreateBiomeSplit(bool isSubCondition)
         {
             var setting = new BelowZeroBiomeSplit();
-            var data = BelowZeroVersionedData.GetBiomes(CurrentGameVersion, Alpha.Checked);
+            var data = Alpha.Checked ? BiomesAlpha.Value : Biomes.Value;
             BindCombo(setting.cboBiome1, data, null, Alpha.Checked);
             BindCombo(setting.cboBiome2, data, null, Alpha.Checked);
             setting.IsSubCondition = isSubCondition;
             setting.Split.IsSubCondition = isSubCondition;
-            setting.btnEdit.Text = "✔";
             AddHandlers(setting);
 
             if (isSubCondition)

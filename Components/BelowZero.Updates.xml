@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <updates>
+    <update version="1.2.0.0">
+        <files>
+            <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>
+        </files>
+        <changelog>
+            <change>Fix Blueprint Unlock Tracking to Correct KnownTech.KnownTech</change>
+            <change>Add Correct Story Goal Tracking</change>
+            <change>Update Internal Helpers, Remove Useless ones, Change Names, Add New Ones for Specific Things</change>
+        </changelog>
+    </update>
     <update version="1.1.0.7">
         <files>
             <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>

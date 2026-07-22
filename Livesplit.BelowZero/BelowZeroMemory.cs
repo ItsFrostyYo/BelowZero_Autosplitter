@@ -1,12 +1,9 @@
-using LiveSplit.Model;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Text.RegularExpressions;
-using System.Threading;
+using System.Windows.Forms;
 using Voxif.AutoSplitter;
 using Voxif.Helpers.Unity;
 using Voxif.IO;
@@ -29,15 +26,13 @@ namespace LiveSplit.BelowZero
         public bool isInMainMenu;
         public bool wasInMainMenu;
         public bool pointersInitialized;
-        public GameVersion gameVersion = BelowZeroVersionedData.BaselineVersion;
+        private GameVersion gameVersion = GameVersion.Oct2025;
 
         private const int inventoryCapacitySlots = 48;
         private const int maxInventoryTimeWithoutChangingMs = 1000;
         private const int maxBuilderMenuSelectionWindowMs = 3000;
         private const int minThrowSplitCooldownMs = 250;
-        private const int maxAcquireAlAnInteractionWindowMs = 5000;
         private const int maxBraceInteractionWindowMs = 120000;
-        private static readonly Regex BuildTimeYearRegex = new Regex(@"(?<!\d)(20\d{2})(?!\d)", RegexOptions.Compiled);
         public readonly Dictionary<SplitName, Func<bool>> splitConditions;
         public readonly Dictionary<SplitName, Func<bool>> subConditions;
 
@@ -46,7 +41,6 @@ namespace LiveSplit.BelowZero
         private Dictionary<TechType, int> currentInventoryChanges = new Dictionary<TechType, int>();
         private readonly Stopwatch throwSplitCooldown = new Stopwatch();
         private readonly Stopwatch builderMenuSelectionWindow = new Stopwatch();
-        private readonly Stopwatch acquireAlAnInteractionWindow = new Stopwatch();
         private readonly Stopwatch braceInteractionWindow = new Stopwatch();
         private TechType lastThrowSplitTool = TechType.None;
         private TechType startedCraft = TechType.None;
@@ -54,74 +48,68 @@ namespace LiveSplit.BelowZero
         private TechType completedBuild = TechType.None;
         private TechType pendingBuilderCompletionTechType = TechType.None;
         private IntPtr trackedHoverpadConstructorPtr = IntPtr.Zero;
-        private bool hasUnityObjectCachedPtrOffset = true;
         private bool builderMenuSelectionPending;
         private bool braceReadyForCinematic;
         private bool craftAnalyticsInitialized;
         private bool hoverpadConstructingInitialized;
         private bool hoverpadConstructingOld;
-        private bool acquireAlAnTargetActive;
         private bool inventoryInitialized;
         private bool blueprintsInitialized;
         private bool encyclopediaInitialized;
         private bool storyGoalsInitialized;
-        private StoryGoal acquireAlAnTargetGoal = StoryGoal.None;
-        private StoryGoal acquireAlAnArmedGoal = StoryGoal.None;
+        private string storyGoalReaderStatus = string.Empty;
+        private string storyGoalReaderMode = string.Empty;
+        private int storyGoalSlotsOffset;
+        private bool storyGoalUsesStringArray;
         public bool MovementStartArmed { get; set; }
         private int playerInventorySlotsUsed;
         private int playerInventorySlotsUsedOld;
         private int unityObjectCachedPtrOffset = 0x10;
-        private bool directPositionPointersBound;
-        private DateTime nextDirectSignalRetryUtc = DateTime.MinValue;
-        private IntPtr acquireAlAnTargetPtr = IntPtr.Zero;
 
         public Pointer<bool> IsIntroCinematicActive;
-        public Pointer<bool> IsAnimationPlaying;
+        private Pointer<bool> IsAnimationPlaying;
         public Pointer<bool> IsLoadingScreenShowing;
         public Pointer<bool> IsPlayerJumping;
-        public Pointer<bool> DeathScreenActive;
+        private Pointer<bool> DeathScreenActive;
         public Pointer<bool> PlayerControllerInputEnabled;
-        public Pointer<float> PlayerControllerVelocityX;
-        public Pointer<float> PlayerControllerVelocityZ;
-        public Pointer<float> Health;
-        public Pointer<float> MoveDirectionX;
-        public Pointer<float> MoveDirectionZ;
-        public Pointer<bool> BuilderMenuState;
-        public Pointer<int> BuilderLastTechType;
-        public Pointer<bool> PlayerIsUnderwater;
-        public Pointer<bool> PlayerIsInside;
-        public Pointer<IntPtr> MainMenu;
-        public Pointer<IntPtr> BuilderPrefab;
+        private Pointer<float> PlayerControllerVelocityX;
+        private Pointer<float> PlayerControllerVelocityZ;
+        private Pointer<float> Health;
+        private Pointer<float> MoveDirectionX;
+        private Pointer<float> MoveDirectionZ;
+        private Pointer<bool> BuilderMenuState;
+        private Pointer<int> BuilderLastTechType;
+        private Pointer<bool> PlayerIsUnderwater;
+        private Pointer<bool> PlayerIsInside;
+        private Pointer<IntPtr> MainMenu;
+        private Pointer<IntPtr> BuilderPrefab;
         public Pointer<IntPtr> PlayerMain;
         public Pointer<IntPtr> CraftingMenu;
-        public Pointer<IntPtr> GuiHandActiveTarget;
+        private Pointer<IntPtr> GuiHandActiveTarget;
         private Pointer<IntPtr> craftingAnalyticsEntriesPtr;
         private Pointer<IntPtr> knownTechPtr;
         private Pointer<IntPtr> encyclopediaPtr;
-        public Pointer<bool> PDAIsInUse;
+        private Pointer<bool> PDAIsInUse;
         public Pointer<int> PDATab;
-        public Pointer<int> CraftedNode;
+        private Pointer<int> CraftedNode;
         public StringPointer BiomeString;
-        public StringPointer ActiveToolName;
+        private StringPointer ActiveToolName;
         private Pointer<float> PlayerLastPositionX;
         private Pointer<float> PlayerLastPositionY;
         private Pointer<float> PlayerLastPositionZ;
         private Pointer<float> DirectPositionX;
         private Pointer<float> DirectPositionY;
         private Pointer<float> DirectPositionZ;
-        private StringPointer handReticleRawTextHand;
-        private StringPointer handReticleVisibleTextHand;
-        public Pointer<bool> PrecursorTransferActive;
         private Pointer<IntPtr> completedStoryGoalsPtr;
 
-        public Dictionary<TechType, int> PlayerInventory = new Dictionary<TechType, int>();
-        public Dictionary<TechType, int> PlayerInventoryOld = new Dictionary<TechType, int>();
-        public List<TechType> PlayerEquipment = new List<TechType>();
-        public List<TechType> PlayerEquipmentOld = new List<TechType>();
-        public List<TechType> KnownTech = new List<TechType>();
-        public List<TechType> KnownTechOld = new List<TechType>();
-        public List<EncyclopediaEntry> Encyclopedia = new List<EncyclopediaEntry>();
-        public List<EncyclopediaEntry> EncyclopediaOld = new List<EncyclopediaEntry>();
+        private Dictionary<TechType, int> PlayerInventory = new Dictionary<TechType, int>();
+        private Dictionary<TechType, int> PlayerInventoryOld = new Dictionary<TechType, int>();
+        private List<TechType> PlayerEquipment = new List<TechType>();
+        private List<TechType> PlayerEquipmentOld = new List<TechType>();
+        private List<TechType> KnownTech = new List<TechType>();
+        private List<TechType> KnownTechOld = new List<TechType>();
+        private List<EncyclopediaEntry> Encyclopedia = new List<EncyclopediaEntry>();
+        private List<EncyclopediaEntry> EncyclopediaOld = new List<EncyclopediaEntry>();
         private HashSet<string> completedStoryGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private HashSet<string> newlyCompletedStoryGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<TechType, int> craftCounts = new Dictionary<TechType, int>();
@@ -146,21 +134,13 @@ namespace LiveSplit.BelowZero
         private int dict_off_entries;
         private int dict_off_version;
         private int hashset_off_slots;
-        private int hashset_off_count;
-        private int hashset_off_version;
         private int arr_off_len;
         private int arr_data_base;
         private int off_hoverpadConstructorField;
         private int off_hoverpadTerminalHoverpad;
         private int off_hoverpadConstructorConstructing;
-        private int off_storyHandTargetPrimaryTooltip;
-        private int off_storyHandTargetSecondaryTooltip;
-        private int off_storyHandTargetGoal;
-        private int off_storyGoalKey;
-        private MethodInfo helperClassNameMethod;
-        private MethodInfo helperClassNamespaceMethod;
 
-        public BelowZeroMemory(LiveSplitState state, BelowZeroComponent component, Logger logger, BelowZeroSettings settings)
+        public BelowZeroMemory(Logger logger, BelowZeroSettings settings)
             : base(logger)
         {
             this.settings = settings;
@@ -192,12 +172,14 @@ namespace LiveSplit.BelowZero
             {
                 logger.Log("OnExit: clearing Below Zero memory state.");
                 pointersInitialized = false;
-                gameVersion = BelowZeroVersionedData.BaselineVersion;
-                settings.SetGameVersion(gameVersion);
+                gameVersion = GameVersion.Oct2025;
                 ResetRunState();
                 wasInMainMenu = false;
                 isInMainMenu = false;
-                directPositionPointersBound = false;
+                storyGoalReaderStatus = string.Empty;
+                storyGoalReaderMode = string.Empty;
+                storyGoalSlotsOffset = 0;
+                storyGoalUsesStringArray = false;
                 DirectPositionX = null;
                 DirectPositionY = null;
                 DirectPositionZ = null;
@@ -242,7 +224,7 @@ namespace LiveSplit.BelowZero
                 { SplitName.ThrowSnowballSplit, () => InventoryItemRemovedOutsidePDA(TechType.SnowBall, "Snowball") },
                 { SplitName.PropulsionCannonDrownSplit, () => PlayerDied() && IsInsideBiomes(Biome.arctickelp_caveinner, Biome.arctickelp_caveouter) && KnowsTech(TechType.PropulsionCannon, TechType.PropulsionCannonBlueprint) },
                 { SplitName.TwistyBridgesDeathSplit, () => PlayerDied() && IsInsideBiomes(Biome.twistyBridges, Biome.twistyBridges_Deep) },
-                { SplitName.AcquireAlAnSplit, IsAcquireAlAnSplitTriggered },
+                { SplitName.AcquireAlAnSplit, () => IsAnimationPlaying != null && IsAnimationPlaying.Changed && IsAnimationPlaying.New && !IsAnimationPlaying.Old && !string.IsNullOrEmpty(BiomeString.New) && BiomeString.New.StartsWith("Precursor_Sanctuary", StringComparison.OrdinalIgnoreCase) },
                 { SplitName.BoosterTankDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.purpleVents) && KnowsTech(TechType.SuitBoosterTank) },
                 { SplitName.ArcticSpiresScanSplit, () => UnlockedTech(TechType.PrecursorNPCTissue) },
                 { SplitName.ArcticSpiresDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.ArcticSpiresCache) },
@@ -253,11 +235,11 @@ namespace LiveSplit.BelowZero
                 { SplitName.CrystalCavesCacheScanSplit, () => UnlockedTech(TechType.PrecursorNPCOrgans) },
                 { SplitName.CrystalCavesCacheDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.CrystalCave_Cache) },
                 { SplitName.CrystalCavesCacheTransitionSplit, () => TransitionedFromBiome(Biome.CrystalCave_Cache) },
-                { SplitName.CommenceStorageMediumFabricationSplit, () => TryConsumeStartedCraft(TechType.PrecursorNPCBody) || CompletedStoryGoal(StoryGoal.Log_Alan_BodyBuilt) },
-                { SplitName.AlAnTransferSplit, () => (PrecursorTransferActive != null && PrecursorTransferActive.Changed && PrecursorTransferActive.New) || CompletedStoryGoal(StoryGoal.OnPrecursorNPCTransfer) },
+                { SplitName.CommenceStorageMediumFabricationSplit, () => CompletedStoryGoal(StoryGoal.OnFabricatePrecursorNPC) },
+                { SplitName.AlAnTransferSplit, () => CompletedStoryGoal(StoryGoal.BeginPrecursorNPCTransfer) },
                 { SplitName.AlAnTransferDeathSplit, () => PlayerDied() && IsInsideBiome(Biome.Precursor_Fabricator) },
                 { SplitName.BraceSplit, IsBraceSplitTriggered },
-                { SplitName.InsertHydraulicsFluidSplit, () => InventoryItemRemovedOutsidePDA(TechType.HydraulicFluid, "Hydraulic Fluid") },
+                { SplitName.InsertHydraulicsFluidSplit, () => CompletedStoryGoal(StoryGoal.OnGlacialBasinBridgeItemInserted) },
             };
         }
 
@@ -319,7 +301,6 @@ namespace LiveSplit.BelowZero
             if (!pointersInitialized || game == null)
                 return false;
 
-            RefreshVersionSpecificSignalPointersIfNeeded();
             UpdateMainMenuState();
             UpdateMemoryWatchers();
             return true;
@@ -332,9 +313,10 @@ namespace LiveSplit.BelowZero
             if (isInMainMenu)
             {
                 if (!wasInMainMenu)
+                {
                     logger.Log("Main menu entered.");
-
-                ResetRunState();
+                    ResetRunState();
+                }
             }
             else if (wasInMainMenu)
             {
@@ -344,10 +326,12 @@ namespace LiveSplit.BelowZero
 
         private void UpdateMemoryWatchers()
         {
-            if (settings.StartEnabled || Needs(SplitName.Inventory, SplitName.FullInventorySplit, SplitName.ThrowFlareSplit, SplitName.ThrowSnowballSplit, SplitName.InsertHydraulicsFluidSplit))
+            HashSet<SplitName> usedSplitNames = GetUsedSplitNames();
+
+            if (settings.StartEnabled || Needs(usedSplitNames, SplitName.Inventory, SplitName.FullInventorySplit, SplitName.ThrowFlareSplit, SplitName.ThrowSnowballSplit))
                 UpdateInventory();
 
-            if (Needs(
+            if (Needs(usedSplitNames,
                 SplitName.Blueprint,
                 SplitName.PropulsionCannonDrownSplit,
                 SplitName.BoosterTankDeathSplit,
@@ -356,7 +340,7 @@ namespace LiveSplit.BelowZero
                 SplitName.CrystalCavesCacheScanSplit))
                 UpdateBlueprints();
 
-            if (Needs(
+            if (Needs(usedSplitNames,
                 SplitName.DeathSplit,
                 SplitName.PropulsionCannonDrownSplit,
                 SplitName.TwistyBridgesDeathSplit,
@@ -370,212 +354,51 @@ namespace LiveSplit.BelowZero
                 DeathScreenActive.ForceUpdate();
             }
 
-            if (Needs(SplitName.Encyclopedia))
+            if (Needs(usedSplitNames, SplitName.Encyclopedia))
                 UpdateEncyclopedia();
 
             UpdateStoryGoals();
 
-            if (Needs(SplitName.Craft, SplitName.AcquireAlAnSplit))
-                CaptureTrackedInteractiveTargets();
+            if (Needs(usedSplitNames, SplitName.Craft))
+                CaptureHoverpadConstructor();
 
-            if (Needs(SplitName.Craft, SplitName.Build, SplitName.CommenceStorageMediumFabricationSplit))
+            if (Needs(usedSplitNames, SplitName.Craft, SplitName.Build))
                 UpdateCraftAndBuildState();
 
         }
 
         private void GetGameVersion()
         {
-            string processPath = string.Empty;
-            string processFileVersion = string.Empty;
-            gameVersion = BelowZeroVersionedData.BaselineVersion;
+            System.Diagnostics.ProcessModule firstModule = game.Process.Modules
+                .Cast<System.Diagnostics.ProcessModule>()
+                .FirstOrDefault();
+            if (firstModule == null)
+                return;
 
-            try
+            int moduleLength = firstModule.ModuleMemorySize;
+            switch (moduleLength)
             {
-                processPath = game.Process.MainModule?.FileName ?? string.Empty;
-                if (!string.IsNullOrEmpty(processPath))
-                {
-                    processFileVersion = FileVersionInfo.GetVersionInfo(processPath).FileVersion ?? string.Empty;
-                    logger.Log($"Attached executable: {processPath}");
-                    if (!string.IsNullOrEmpty(processFileVersion))
-                        logger.Log($"Executable file version: {processFileVersion}");
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.Log($"Failed to read executable version info: {ex.Message}");
-            }
-
-            System.Diagnostics.ProcessModule unityPlayer = null;
-            try
-            {
-                unityPlayer = game.Process.Modules
-                    .Cast<System.Diagnostics.ProcessModule>()
-                    .FirstOrDefault(module => string.Equals(Path.GetFileName(module.FileName), "UnityPlayer.dll", StringComparison.OrdinalIgnoreCase));
-            }
-            catch (Exception ex)
-            {
-                logger.Log($"Failed to enumerate process modules: {ex.Message}");
-            }
-
-            long unityPlayerDiskSize = 0;
-            if (unityPlayer != null)
-            {
-                logger.Log($"UnityPlayer path: {unityPlayer.FileName}");
-                logger.Log($"UnityPlayer size: {unityPlayer.ModuleMemorySize}");
-                try
-                {
-                    unityPlayerDiskSize = new FileInfo(unityPlayer.FileName).Length;
-                    logger.Log($"UnityPlayer disk size: {unityPlayerDiskSize}");
-                }
-                catch (Exception ex)
-                {
-                    logger.Log($"Failed to read UnityPlayer disk size: {ex.Message}");
-                }
-            }
-            else
-            {
-                logger.Log("UnityPlayer.dll not found; continuing with fallback version detection.");
-            }
-
-            bool versionDetected = false;
-            if (!string.IsNullOrWhiteSpace(processFileVersion) && Version.TryParse(processFileVersion, out Version parsedVersion))
-            {
-                if (parsedVersion == new Version(2019, 4, 9, 630))
-                {
+                case 671744:
                     gameVersion = GameVersion.Aug2021;
-                    versionDetected = true;
-                    logger.Log("Executable version exact match 2019.4.9.630 -> Aug2021.");
-                }
-                else if (parsedVersion == new Version(2019, 4, 36, 870))
-                {
+                    logger.Log("Game version August 2021");
+                    break;
+
+                case 675840:
                     gameVersion = GameVersion.Oct2025;
-                    versionDetected = true;
-                    logger.Log("Executable version exact match 2019.4.36.870 -> Oct2025.");
-                }
-                else if (parsedVersion.Build == 9)
-                {
-                    gameVersion = GameVersion.Aug2021;
-                    versionDetected = true;
-                    logger.Log($"Executable version {parsedVersion} matched 2019.4.9.x family -> Aug2021.");
-                }
-                else if (parsedVersion.Build == 36)
-                {
+                    logger.Log("Game version October 2025");
+                    break;
+
+                default:
                     gameVersion = GameVersion.Oct2025;
-                    versionDetected = true;
-                    logger.Log($"Executable version {parsedVersion} matched 2019.4.36.x family -> Oct2025.");
-                }
+                    MessageBox.Show(
+                        $"Module length {moduleLength} does not match a version, defaulting to most recent (October 2025)",
+                        "Below Zero Autosplitter",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    break;
             }
 
-            if (!versionDetected && unityPlayer != null)
-            {
-                try
-                {
-                    string unityPlayerFileVersion = FileVersionInfo.GetVersionInfo(unityPlayer.FileName).FileVersion ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(unityPlayerFileVersion) && Version.TryParse(unityPlayerFileVersion, out Version parsedUnityPlayerVersion))
-                    {
-                        if (parsedUnityPlayerVersion == new Version(2019, 4, 9, 630) || parsedUnityPlayerVersion.Build == 9)
-                        {
-                            gameVersion = GameVersion.Aug2021;
-                            versionDetected = true;
-                            logger.Log($"UnityPlayer file version {parsedUnityPlayerVersion} -> Aug2021.");
-                        }
-                        else if (parsedUnityPlayerVersion == new Version(2019, 4, 36, 870) || parsedUnityPlayerVersion.Build == 36)
-                        {
-                            gameVersion = GameVersion.Oct2025;
-                            versionDetected = true;
-                            logger.Log($"UnityPlayer file version {parsedUnityPlayerVersion} -> Oct2025.");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.Log($"Failed to read UnityPlayer version info: {ex.Message}");
-                }
-            }
-
-            if (!versionDetected && TryDetectVersionFromBuildTime(processPath, out GameVersion buildTimeVersion))
-            {
-                gameVersion = buildTimeVersion;
-                versionDetected = true;
-            }
-
-            if (!versionDetected && !string.IsNullOrEmpty(processPath))
-            {
-                if (processPath.IndexOf("2021", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    gameVersion = GameVersion.Aug2021;
-                    versionDetected = true;
-                    logger.Log("Executable path hint matched 2021 -> Aug2021.");
-                }
-                else if (processPath.IndexOf("2025", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    gameVersion = GameVersion.Oct2025;
-                    versionDetected = true;
-                    logger.Log("Executable path hint matched 2025 -> Oct2025.");
-                }
-            }
-
-            if (!versionDetected && unityPlayer != null)
-            {
-                switch (unityPlayerDiskSize)
-                {
-                    case 25893376:
-                        gameVersion = GameVersion.Aug2021;
-                        versionDetected = true;
-                        logger.Log("UnityPlayer size exact match 25893376 -> Aug2021.");
-                        break;
-                    case 26137088:
-                        gameVersion = GameVersion.Oct2025;
-                        versionDetected = true;
-                        logger.Log("UnityPlayer size exact match 26137088 -> Oct2025.");
-                        break;
-                    default:
-                        logger.Log($"Unknown UnityPlayer.dll size {unityPlayerDiskSize}, keeping fallback {gameVersion}.");
-                        break;
-                }
-            }
-
-            if (!versionDetected)
-                logger.Log($"Version not matched exactly; using fallback {gameVersion}.");
-
-            logger.Log($"Game version {gameVersion}");
             settings.SetGameVersion(gameVersion);
-            OnVersionDetected?.Invoke(gameVersion.ToString());
-        }
-
-        private bool TryDetectVersionFromBuildTime(string processPath, out GameVersion detectedVersion)
-        {
-            detectedVersion = BelowZeroVersionedData.BaselineVersion;
-            if (string.IsNullOrWhiteSpace(processPath))
-                return false;
-
-            string processDirectory = Path.GetDirectoryName(processPath);
-            if (string.IsNullOrWhiteSpace(processDirectory))
-                return false;
-
-            string buildTimePath = Path.Combine(processDirectory, "SubnauticaZero_Data", "StreamingAssets", "__buildtime.txt");
-            if (!File.Exists(buildTimePath))
-                return false;
-
-            try
-            {
-                string buildTimeText = File.ReadAllText(buildTimePath);
-                Match match = BuildTimeYearRegex.Match(buildTimeText ?? string.Empty);
-                if (!match.Success || !int.TryParse(match.Groups[1].Value, out int buildYear))
-                {
-                    logger.Log($"Build time file did not contain a usable year: {buildTimePath}");
-                    return false;
-                }
-
-                detectedVersion = buildYear <= 2021 ? GameVersion.Aug2021 : GameVersion.Oct2025;
-                logger.Log($"Build time year {buildYear} from {buildTimePath} -> {detectedVersion}.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                logger.Log($"Failed to read build time file '{buildTimePath}': {ex.Message}");
-                return false;
-            }
         }
 
         private void InitPointers(IMonoHelper mono)
@@ -585,7 +408,7 @@ namespace LiveSplit.BelowZero
             var ptrFactory = new MonoNestedPointerFactory(game, mono);
             var unity = (UnityHelperTask.UnityHelperBase)mono;
 
-            ForceRefreshVersionSpecificSignalPointers();
+            InitializeVersionSpecificSignalPointers();
 
             if (IsAnimationPlaying == null)
             {
@@ -675,10 +498,8 @@ namespace LiveSplit.BelowZero
                         dict_off_version = versionOffset;
                 }
 
-                IntPtr hashSetKlass = unity.TryFindClassOnce("HashSet`1", core);
+                IntPtr hashSetKlass = unity.TryFindClassOnce("System.Collections.Generic.HashSet`1", core);
                 hashset_off_slots = 0x18;
-                hashset_off_count = 0x20;
-                hashset_off_version = 0x28;
                 if (hashSetKlass != IntPtr.Zero)
                 {
                     int slotsOffset = unity.ResolveFieldOffsetByNameOrPredicate(
@@ -687,20 +508,6 @@ namespace LiveSplit.BelowZero
                         name => UnityHelperTask.UnityNameUtil.NameHas(name, "slots"));
                     if (slotsOffset != 0)
                         hashset_off_slots = slotsOffset;
-
-                    int countOffset = unity.ResolveFieldOffsetByNameOrPredicate(
-                        hashSetKlass,
-                        new[] { "_count", "m_count", "count" },
-                        name => UnityHelperTask.UnityNameUtil.NameHas(name, "count"));
-                    if (countOffset != 0)
-                        hashset_off_count = countOffset;
-
-                    int versionOffset = unity.ResolveFieldOffsetByNameOrPredicate(
-                        hashSetKlass,
-                        new[] { "_version", "m_version", "version" },
-                        name => UnityHelperTask.UnityNameUtil.NameHas(name, "version"));
-                    if (versionOffset != 0)
-                        hashset_off_version = versionOffset;
                 }
 
             }
@@ -708,17 +515,10 @@ namespace LiveSplit.BelowZero
             knownTechPtr = ptrFactory.Make<IntPtr>("KnownTech", "knownTech");
             encyclopediaPtr = ptrFactory.Make<IntPtr>("Player", "main", "encyclopedia");
 
-            IntPtr storyGoalManagerKlass = mono.FindClass("StoryGoalManager", mono.MainImage);
-            if (storyGoalManagerKlass != IntPtr.Zero)
-            {
-                int off_completedGoals = mono.GetFieldOffset(storyGoalManagerKlass, "completedGoals");
-                if (off_completedGoals != 0)
-                {
-                    Pointer<IntPtr> storyGoalManagerMainPtr = ptrFactory.Make<IntPtr>("StoryGoalManager", "<main>k__BackingField")
-                        ?? ptrFactory.Make<IntPtr>("StoryGoalManager", "main");
-                    completedStoryGoalsPtr = ptrFactory.Make<IntPtr>(storyGoalManagerMainPtr, off_completedGoals);
-                }
-            }
+            completedStoryGoalsPtr = ptrFactory.Make<IntPtr>(
+                "Story.StoryGoalManager",
+                "<main>k__BackingField",
+                "completedGoals");
 
             IntPtr craftingAnalyticsKlass = mono.FindClass("CraftingAnalytics", mono.MainImage);
             int off_craftingAnalyticsEntries = mono.GetFieldOffset(craftingAnalyticsKlass, "entries");
@@ -769,7 +569,6 @@ namespace LiveSplit.BelowZero
             IsPlayerJumping = ptrFactory.Make<bool>(jumpingStatePtr, 0x24);
 
             DeathScreenActive = ptrFactory.Make<bool>("uGUI_PlayerDeath", "main", "active");
-            PrecursorTransferActive = ptrFactory.Make<bool>("PrecursorFabricatorController", "isTransferActive");
 
             Pointer<IntPtr> quickSlotsPtr = ptrFactory.Make<IntPtr>("Inventory", "main", "<quickSlots>k__BackingField");
             int off_activeToolName = mono.GetFieldOffset(mono.FindClass("QuickSlots"), "activeToolName");
@@ -778,24 +577,6 @@ namespace LiveSplit.BelowZero
             Pointer<IntPtr> guiHandPtr = ptrFactory.Make<IntPtr>("Player", "main", "guiHand");
             int off_activeTarget = mono.GetFieldOffset(mono.FindClass("GUIHand"), "activeTarget");
             GuiHandActiveTarget = ptrFactory.Make<IntPtr>(guiHandPtr, off_activeTarget);
-            handReticleRawTextHand = ptrFactory.MakeString("HandReticle", "main", "textHand", ptrFactory.StringHeaderSize);
-
-            Pointer<IntPtr> handReticleCompTextHandPtr = ptrFactory.Make<IntPtr>("HandReticle", "main", "compTextHand");
-            IntPtr tmpImage = unity.TryFindImageOnce(
-                "Unity.TextMeshPro",
-                "Unity.TextMeshPro.dll",
-                "TMPro",
-                "TMPro.dll");
-            IntPtr tmpTextKlass = tmpImage != IntPtr.Zero ? unity.TryFindClassOnce("TMPro.TMP_Text", tmpImage) : IntPtr.Zero;
-            if (tmpTextKlass != IntPtr.Zero)
-            {
-                int off_tmpText = unity.ResolveFieldOffsetByNameOrPredicate(
-                    tmpTextKlass,
-                    new[] { "m_text" },
-                    name => string.Equals(name, "m_text", StringComparison.Ordinal));
-                if (off_tmpText != 0)
-                    handReticleVisibleTextHand = ptrFactory.MakeString(handReticleCompTextHandPtr, off_tmpText, ptrFactory.StringHeaderSize);
-            }
 
             Pointer<IntPtr> playerControllerPtr = ptrFactory.Make<IntPtr>("Player", "main", "<playerController>k__BackingField");
             int off_velocity = mono.GetFieldOffset(mono.FindClass("PlayerController"), "velocity");
@@ -836,40 +617,16 @@ namespace LiveSplit.BelowZero
             IntPtr hoverpadConstructorKlass = mono.FindClass("HoverpadConstructor", mono.MainImage);
             off_hoverpadConstructorConstructing = mono.GetFieldOffset(hoverpadConstructorKlass, "_constructing");
 
-            IntPtr storyHandTargetKlass = mono.FindClass("StoryHandTarget", mono.MainImage);
-            if (storyHandTargetKlass != IntPtr.Zero)
-            {
-                off_storyHandTargetPrimaryTooltip = mono.GetFieldOffset(storyHandTargetKlass, "primaryTooltip");
-                off_storyHandTargetSecondaryTooltip = mono.GetFieldOffset(storyHandTargetKlass, "secondaryTooltip");
-                off_storyHandTargetGoal = mono.GetFieldOffset(storyHandTargetKlass, "goal");
-            }
-
-            IntPtr storyGoalKlass = mono.FindClass("StoryGoal", mono.MainImage);
-            if (storyGoalKlass != IntPtr.Zero)
-                off_storyGoalKey = mono.GetFieldOffset(storyGoalKlass, "key");
-
-            Type helperType = mono.GetType();
-            while (helperType != null && (helperClassNameMethod == null || helperClassNamespaceMethod == null))
-            {
-                if (helperClassNameMethod == null)
-                    helperClassNameMethod = helperType.GetMethod("ClassName", BindingFlags.Instance | BindingFlags.NonPublic);
-
-                if (helperClassNamespaceMethod == null)
-                    helperClassNamespaceMethod = helperType.GetMethod("ClassNamespace", BindingFlags.Instance | BindingFlags.NonPublic);
-
-                helperType = helperType.BaseType;
-            }
-
             pointersInitialized = true;
             logger.Log("Pointers initialized");
         }
 
-        private bool Needs(params SplitName[] required)
+        private HashSet<SplitName> GetUsedSplitNames()
         {
-            if (settings?.Splits == null || settings.Splits.Count == 0)
-                return false;
-
             var usedSplitNames = new HashSet<SplitName>();
+            if (settings?.Splits == null || settings.Splits.Count == 0)
+                return usedSplitNames;
+
             foreach (var split in settings.Splits)
             {
                 usedSplitNames.Add(split.SplitName);
@@ -877,8 +634,11 @@ namespace LiveSplit.BelowZero
                     usedSplitNames.Add(conditionSplit.SplitName);
             }
 
-            return required.Any(usedSplitNames.Contains);
+            return usedSplitNames;
         }
+
+        private static bool Needs(HashSet<SplitName> usedSplitNames, params SplitName[] required) =>
+            required.Any(usedSplitNames.Contains);
 
         private bool IsInMainMenu()
         {
@@ -890,8 +650,6 @@ namespace LiveSplit.BelowZero
 
             return IsMainMenuPosition(PlayerLastPositionX?.New ?? float.NaN, PlayerLastPositionY?.New ?? float.NaN, PlayerLastPositionZ?.New ?? float.NaN);
         }
-
-        public bool ShouldPause() => false;
 
         private void UpdateBlueprints()
         {
@@ -1070,15 +828,13 @@ namespace LiveSplit.BelowZero
             return true;
         }
 
-        public bool IsIntroCinematicPlaying() => IsIntroCinematicActive?.New ?? false;
-
         private bool HasPlayerItem(TechType techType) => PlayerInventory.ContainsKey(techType) || PlayerEquipment.Contains(techType);
 
         private int GetPlayerItemCount(TechType techType) => PlayerInventory.GetCount(techType) + PlayerEquipment.Count(item => item == techType);
 
         private int GetPlayerItemCountOld(TechType techType) => PlayerInventoryOld.GetCount(techType) + PlayerEquipmentOld.Count(item => item == techType);
 
-        public bool IsPDAInventoryOpen()
+        private bool IsPDAInventoryOpen()
         {
             if (!(PDAIsInUse?.New ?? false))
                 return false;
@@ -1089,15 +845,24 @@ namespace LiveSplit.BelowZero
         private void UpdateStoryGoals()
         {
             newlyCompletedStoryGoals.Clear();
-            if (!TryReadCompletedStoryGoals(out HashSet<string> currentGoals))
+            if (isInMainMenu)
                 return;
+
+            if (!TryReadCompletedStoryGoals(out HashSet<string> currentGoals, out string failureReason))
+            {
+                LogStoryGoalReaderStatus($"Story goal reader waiting: {failureReason}");
+                return;
+            }
 
             if (!storyGoalsInitialized)
             {
                 completedStoryGoals = currentGoals;
                 storyGoalsInitialized = true;
+                LogStoryGoalReaderStatus($"Story goal tracking initialized with {currentGoals.Count} completed goals.");
                 return;
             }
+
+            LogStoryGoalReaderStatus("Story goal reader active.");
 
             foreach (string goal in currentGoals)
             {
@@ -1111,10 +876,26 @@ namespace LiveSplit.BelowZero
             completedStoryGoals = currentGoals;
         }
 
+        private void LogStoryGoalReaderStatus(string status)
+        {
+            if (string.Equals(storyGoalReaderStatus, status, StringComparison.Ordinal))
+                return;
+
+            storyGoalReaderStatus = status;
+            logger.Log(status);
+        }
+
         private bool CompletedStoryGoal(StoryGoal goal)
         {
             return goal != StoryGoal.None
                 && newlyCompletedStoryGoals.Contains(goal.ToString());
+        }
+
+        private bool HasNotCompletedStoryGoal(StoryGoal goal)
+        {
+            return storyGoalsInitialized
+                && goal != StoryGoal.None
+                && !completedStoryGoals.Contains(goal.ToString());
         }
 
         private bool IsBraceSplitTriggered()
@@ -1156,42 +937,6 @@ namespace LiveSplit.BelowZero
             braceReadyForCinematic = false;
             logger.Log("Brace split: endgame cinematic started after EndGameEnterShip.");
             return true;
-        }
-
-        private bool IsAcquireAlAnSplitTriggered()
-        {
-            if (AcquireAlAnCinematicStarted())
-            {
-                ClearAcquireAlAnArmedState();
-                logger.Log("Acquire Al-An split: sanctuary cinematic started.");
-                return true;
-            }
-
-            if (CompletedStoryGoal(StoryGoal.SanctuaryCompleted))
-            {
-                ClearAcquireAlAnArmedState();
-                logger.Log("Acquire Al-An split: SanctuaryCompleted story goal.");
-                return true;
-            }
-
-            if (!acquireAlAnInteractionWindow.IsRunning)
-                return false;
-
-            if (acquireAlAnInteractionWindow.ElapsedMilliseconds > maxAcquireAlAnInteractionWindowMs)
-            {
-                ClearAcquireAlAnArmedState();
-                return false;
-            }
-
-            if (acquireAlAnArmedGoal != StoryGoal.None
-                && CompletedStoryGoal(acquireAlAnArmedGoal))
-            {
-                logger.Log($"Acquire Al-An split: armed story goal completed ({acquireAlAnArmedGoal}).");
-                ClearAcquireAlAnArmedState();
-                return true;
-            }
-
-            return false;
         }
 
         private bool PlayerDied()
@@ -1252,18 +997,6 @@ namespace LiveSplit.BelowZero
                 && techTypes.Any(techType => techType != TechType.None
                     && KnownTech.Contains(techType)
                     && !KnownTechOld.Contains(techType));
-        }
-
-        private bool IsInsideSanctuary()
-        {
-            return !string.IsNullOrEmpty(BiomeString.New)
-                && BiomeString.New.StartsWith("Precursor_Sanctuary", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private void ClearAcquireAlAnArmedState()
-        {
-            acquireAlAnInteractionWindow.Reset();
-            acquireAlAnArmedGoal = StoryGoal.None;
         }
 
         private bool InventoryItemRemovedOutsidePDA(TechType techType, string displayName)
@@ -1430,35 +1163,13 @@ namespace LiveSplit.BelowZero
             return true;
         }
 
-        private void CaptureTrackedInteractiveTargets()
+        private void CaptureHoverpadConstructor()
         {
-            IntPtr previousAcquireAlAnTargetPtr = acquireAlAnTargetPtr;
-            StoryGoal previousAcquireAlAnGoal = acquireAlAnTargetGoal;
-            bool previousAcquireAlAnTargetActive = acquireAlAnTargetActive;
-            bool trackAcquireAlAn = Needs(SplitName.AcquireAlAnSplit) && IsInsideSanctuary();
-            string acquireAlAnReticleText = trackAcquireAlAn ? GetHandReticleText() : string.Empty;
-            bool acquireAlAnReticleActive = trackAcquireAlAn && IsAcquireAlAnReticleText(acquireAlAnReticleText);
-
-            acquireAlAnTargetActive = false;
-            acquireAlAnTargetPtr = IntPtr.Zero;
-            acquireAlAnTargetGoal = StoryGoal.None;
-
             IntPtr activeTarget = GuiHandActiveTarget?.New ?? IntPtr.Zero;
             if (activeTarget != IntPtr.Zero
                 && TryGetManagedObjectTypeName(activeTarget, out string typeName)
                 && !string.IsNullOrEmpty(typeName))
             {
-                if (string.Equals(typeName, "StoryHandTarget", StringComparison.OrdinalIgnoreCase)
-                    && TryReadStoryHandTargetInfo(activeTarget, out string primaryTooltip, out string secondaryTooltip, out StoryGoal goal))
-                {
-                    if (IsInsideSanctuary() && IsAcquireAlAnStoryTarget(primaryTooltip, secondaryTooltip))
-                    {
-                        acquireAlAnTargetActive = true;
-                        acquireAlAnTargetPtr = activeTarget;
-                        acquireAlAnTargetGoal = goal;
-                    }
-                }
-
                 switch (typeName)
                 {
                     case "HoverpadConstructor":
@@ -1474,22 +1185,6 @@ namespace LiveSplit.BelowZero
                         trackedHoverpadConstructorPtr = ResolveHoverpadConstructorFromHoverpad(activeTarget);
                         break;
                 }
-
-                if (trackAcquireAlAn && acquireAlAnReticleActive)
-                {
-                    if (!acquireAlAnInteractionWindow.IsRunning)
-                        logger.Log("Acquire Al-An watch armed from sanctuary terminal.");
-
-                    acquireAlAnInteractionWindow.Restart();
-                    acquireAlAnTargetActive = true;
-                    acquireAlAnTargetPtr = activeTarget;
-                }
-            }
-
-            if (previousAcquireAlAnTargetActive
-                && (!acquireAlAnTargetActive || previousAcquireAlAnTargetPtr != acquireAlAnTargetPtr))
-            {
-                ArmAcquireAlAnFromTargetLoss(previousAcquireAlAnTargetPtr, previousAcquireAlAnGoal);
             }
         }
 
@@ -1508,125 +1203,6 @@ namespace LiveSplit.BelowZero
                 return IntPtr.Zero;
 
             return game.Read<IntPtr>(objectPtr + offset);
-        }
-
-        private bool TryReadStoryHandTargetInfo(IntPtr storyHandTargetPtr, out string primaryTooltip, out string secondaryTooltip, out StoryGoal goal)
-        {
-            primaryTooltip = string.Empty;
-            secondaryTooltip = string.Empty;
-            goal = StoryGoal.None;
-
-            if (storyHandTargetPtr == IntPtr.Zero)
-                return false;
-
-            try
-            {
-                if (off_storyHandTargetPrimaryTooltip != 0)
-                    primaryTooltip = ReadManagedStringObject(ReadObjectFieldPointer(storyHandTargetPtr, off_storyHandTargetPrimaryTooltip));
-
-                if (off_storyHandTargetSecondaryTooltip != 0)
-                    secondaryTooltip = ReadManagedStringObject(ReadObjectFieldPointer(storyHandTargetPtr, off_storyHandTargetSecondaryTooltip));
-
-                IntPtr goalPtr = ReadObjectFieldPointer(storyHandTargetPtr, off_storyHandTargetGoal);
-                if (goalPtr != IntPtr.Zero && off_storyGoalKey != 0)
-                    TryParseStoryGoal(ReadManagedStringObject(ReadObjectFieldPointer(goalPtr, off_storyGoalKey)), out goal);
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                logger.Log($"Failed to read StoryHandTarget info: {ex.Message}");
-                return false;
-            }
-        }
-
-        private string ReadManagedStringObject(IntPtr stringPtr)
-        {
-            if (stringPtr == IntPtr.Zero)
-                return string.Empty;
-
-            try
-            {
-                int stringHeader = game.PointerSize * 2 + 0x4;
-                return game.ReadString(stringPtr + stringHeader, EStringType.UTF16Sized) ?? string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private bool IsAcquireAlAnStoryTarget(string primaryTooltip, string secondaryTooltip)
-        {
-            return string.Equals(primaryTooltip, "Alan_TerminalInteract", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(secondaryTooltip, "Alan_TerminalInteract", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private string GetHandReticleText()
-        {
-            string visibleText = handReticleVisibleTextHand?.New;
-            if (!string.IsNullOrWhiteSpace(visibleText))
-                return visibleText.Trim();
-
-            string rawText = handReticleRawTextHand?.New;
-            return string.IsNullOrWhiteSpace(rawText) ? string.Empty : rawText.Trim();
-        }
-
-        private static bool IsAcquireAlAnReticleText(string text)
-        {
-            return !string.IsNullOrWhiteSpace(text)
-                && (text.StartsWith("Insert storage medium", StringComparison.OrdinalIgnoreCase)
-                    || text.StartsWith("Alan_TerminalInteract", StringComparison.OrdinalIgnoreCase));
-        }
-
-        private void ArmAcquireAlAnFromTargetLoss(IntPtr previousTargetPtr, StoryGoal previousGoal)
-        {
-            bool targetDestroyed = previousTargetPtr != IntPtr.Zero && !IsLiveManagedUnityObject(previousTargetPtr);
-            if (!targetDestroyed && previousGoal == StoryGoal.None)
-                return;
-
-            acquireAlAnArmedGoal = previousGoal;
-            acquireAlAnInteractionWindow.Restart();
-
-            if (acquireAlAnArmedGoal == StoryGoal.None)
-                logger.Log("Acquire Al-An target lost; interaction window armed.");
-            else
-                logger.Log($"Acquire Al-An target lost; armed goal {acquireAlAnArmedGoal}.");
-
-            if (targetDestroyed)
-            {
-                logger.Log("Acquire Al-An target object was destroyed.");
-            }
-        }
-
-        private bool AcquireAlAnCinematicStarted()
-        {
-            if (!acquireAlAnInteractionWindow.IsRunning)
-                return false;
-
-            if (acquireAlAnInteractionWindow.ElapsedMilliseconds > maxAcquireAlAnInteractionWindowMs)
-                return false;
-
-            if (isInMainMenu || wasInMainMenu || (IsLoadingScreenShowing?.New ?? false))
-                return false;
-
-            if (IsAnimationPlaying != null && IsAnimationPlaying.Changed)
-            {
-                if (IsAnimationPlaying.New && !IsAnimationPlaying.Old)
-                    return true;
-            }
-
-            if (PlayerControllerInputEnabled != null && PlayerControllerInputEnabled.Changed)
-            {
-                if (!PlayerControllerInputEnabled.New
-                    && PlayerControllerInputEnabled.Old
-                    && (IsAnimationPlaying?.New ?? false))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private bool BraceCinematicStarted()
@@ -1678,7 +1254,7 @@ namespace LiveSplit.BelowZero
         private bool TryGetManagedObjectTypeName(IntPtr objectPtr, out string typeName)
         {
             typeName = null;
-            if (objectPtr == IntPtr.Zero || helperClassNameMethod == null)
+            if (objectPtr == IntPtr.Zero)
                 return false;
 
             IntPtr vtablePtr = game.Read<IntPtr>(objectPtr);
@@ -1689,12 +1265,11 @@ namespace LiveSplit.BelowZero
             if (klassPtr == IntPtr.Zero)
                 return false;
 
-            string className = helperClassNameMethod.Invoke(mono, new object[] { klassPtr }) as string;
+            string className = mono.GetClassName(klassPtr);
             if (string.IsNullOrEmpty(className))
                 return false;
 
-            string classNamespace = helperClassNamespaceMethod?.Invoke(mono, new object[] { klassPtr }) as string;
-            typeName = string.IsNullOrEmpty(classNamespace) ? className : $"{classNamespace}.{className}";
+            typeName = className;
             return true;
         }
 
@@ -1769,33 +1344,11 @@ namespace LiveSplit.BelowZero
             pendingBuilderCompletionTechType = TechType.None;
             builderMenuSelectionPending = false;
             builderMenuSelectionWindow.Reset();
-            acquireAlAnInteractionWindow.Reset();
             braceInteractionWindow.Reset();
             braceReadyForCinematic = false;
-            acquireAlAnTargetActive = false;
-            acquireAlAnTargetGoal = StoryGoal.None;
-            acquireAlAnArmedGoal = StoryGoal.None;
-            acquireAlAnTargetPtr = IntPtr.Zero;
             trackedHoverpadConstructorPtr = IntPtr.Zero;
             hoverpadConstructingInitialized = false;
             hoverpadConstructingOld = false;
-        }
-
-        private void ForceRefreshVersionSpecificSignalPointers()
-        {
-            nextDirectSignalRetryUtc = DateTime.UtcNow.AddSeconds(1);
-            InitializeVersionSpecificSignalPointers();
-        }
-
-        private void RefreshVersionSpecificSignalPointersIfNeeded()
-        {
-            if (DateTime.UtcNow < nextDirectSignalRetryUtc)
-                return;
-
-            if (directPositionPointersBound)
-                return;
-
-            ForceRefreshVersionSpecificSignalPointers();
         }
 
         private void InitializeVersionSpecificSignalPointers()
@@ -1837,8 +1390,7 @@ namespace LiveSplit.BelowZero
                         DirectPositionX = MakeModulePointer<float>("UnityPlayer.dll", 0x17B84D8, 0x150, 0xBF8);
                         DirectPositionY = MakeModulePointer<float>("UnityPlayer.dll", 0x17B84D8, 0x150, 0xBFC);
                         DirectPositionZ = MakeModulePointer<float>("UnityPlayer.dll", 0x17B84D8, 0x150, 0xC00);
-                        directPositionPointersBound = DirectPositionX != null && DirectPositionY != null && DirectPositionZ != null;
-                        if (directPositionPointersBound)
+                        if (DirectPositionX != null && DirectPositionY != null && DirectPositionZ != null)
                             logger.Log("Using Aug2021 direct position pointers.");
                         break;
 
@@ -1849,8 +1401,7 @@ namespace LiveSplit.BelowZero
                             ?? MakeModulePointer<float>("fmodstudiol.dll", 0x2CED70, 0xE0, 0x8, 0x20, 0x490);
                         DirectPositionZ = MakeModulePointer<float>("fmodstudio.dll", 0x2CED70, 0xE0, 0x8, 0x20, 0x494)
                             ?? MakeModulePointer<float>("fmodstudiol.dll", 0x2CED70, 0xE0, 0x8, 0x20, 0x494);
-                        directPositionPointersBound = DirectPositionX != null && DirectPositionY != null && DirectPositionZ != null;
-                        if (directPositionPointersBound)
+                        if (DirectPositionX != null && DirectPositionY != null && DirectPositionZ != null)
                             logger.Log("Using Oct2025 direct position pointers.");
                         break;
                 }
@@ -1918,7 +1469,6 @@ namespace LiveSplit.BelowZero
 
         private void ResolveUnityObjectCachedPtrOffset(UnityHelperTask.UnityHelperBase unity)
         {
-            hasUnityObjectCachedPtrOffset = true;
             unityObjectCachedPtrOffset = 0x10;
 
             try
@@ -1963,9 +1513,6 @@ namespace LiveSplit.BelowZero
         {
             if (rawObject == IntPtr.Zero)
                 return false;
-
-            if (!hasUnityObjectCachedPtrOffset)
-                return true;
 
             return game.Read<IntPtr>(rawObject + unityObjectCachedPtrOffset) != IntPtr.Zero;
         }
@@ -2213,53 +1760,118 @@ namespace LiveSplit.BelowZero
             return result;
         }
 
-        private bool TryReadCompletedStoryGoals(out HashSet<string> result)
+        private bool TryReadCompletedStoryGoals(out HashSet<string> result, out string failureReason)
         {
             result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            IntPtr hashSetPtr = completedStoryGoalsPtr?.New ?? IntPtr.Zero;
-            if (hashSetPtr == IntPtr.Zero || hashset_off_slots == 0 || hashset_off_count == 0)
-                return false;
+            failureReason = string.Empty;
 
-            int count = game.Read<int>(hashSetPtr + hashset_off_count);
-            if (count < 0 || count > 200000)
-                return false;
-
-            if (count == 0)
-                return true;
-
-            for (int attempt = 0; attempt < 3; attempt++)
+            if (completedStoryGoalsPtr == null)
             {
-                result.Clear();
-                int versionBefore = hashset_off_version != 0 ? game.Read<int>(hashSetPtr + hashset_off_version) : 0;
-                IntPtr slotsArr = game.Read<IntPtr>(hashSetPtr + hashset_off_slots);
-                if (slotsArr == IntPtr.Zero)
-                    return false;
-
-                int length = game.Read<int>(slotsArr + arr_off_len);
-                if (length <= 0 || length > 200000)
-                    return false;
-
-                int stringHeader = game.PointerSize * 2 + 0x4;
-                int slotStride = game.PointerSize == 8 ? 0x10 : 0x0C;
-                IntPtr basePtr = slotsArr + arr_data_base;
-                for (int i = 0; i < length; i++)
-                {
-                    IntPtr slot = basePtr + i * slotStride;
-                    if (game.Read<int>(slot) < 0)
-                        continue;
-
-                    IntPtr valuePtr = game.Read<IntPtr>(slot + 0x08);
-                    if (TryReadStoryGoalKey(valuePtr, stringHeader, out string goal))
-                        result.Add(goal);
-                }
-
-                int versionAfter = hashset_off_version != 0 ? game.Read<int>(hashSetPtr + hashset_off_version) : versionBefore;
-                if (versionAfter == versionBefore)
-                    return true;
+                failureReason = "completed-goals pointer was not created.";
+                return false;
             }
 
-            result.Clear();
-            return false;
+            IntPtr hashSetPtr = completedStoryGoalsPtr?.New ?? IntPtr.Zero;
+            if (hashSetPtr == IntPtr.Zero)
+            {
+                failureReason = "StoryGoalManager.main or completedGoals is not available yet.";
+                return false;
+            }
+
+            int stringHeader = game.PointerSize * 2 + 0x4;
+            if (storyGoalSlotsOffset != 0)
+            {
+                bool readCachedLayout = storyGoalUsesStringArray
+                    ? TryReadStoryGoalsFromStringArray(hashSetPtr, storyGoalSlotsOffset, stringHeader, out result)
+                    : TryReadStoryGoalsFromSlotArray(hashSetPtr, storyGoalSlotsOffset, stringHeader, out result);
+                if (readCachedLayout)
+                    return true;
+
+                storyGoalReaderMode = string.Empty;
+                storyGoalSlotsOffset = 0;
+                storyGoalUsesStringArray = false;
+            }
+
+            var candidates = new List<(HashSet<string> Goals, string Mode, int Score, int Offset, bool UsesStringArray)>();
+            foreach (int slotsOffset in new[] { hashset_off_slots, 0x18, 0x20, 0x10 }.Where(offset => offset != 0).Distinct())
+            {
+                if (TryReadStoryGoalsFromSlotArray(hashSetPtr, slotsOffset, stringHeader, out HashSet<string> slotGoals))
+                    candidates.Add((slotGoals, $"slot-array@0x{slotsOffset:X}", ScoreStoryGoalSet(slotGoals), slotsOffset, false));
+
+                if (TryReadStoryGoalsFromStringArray(hashSetPtr, slotsOffset, stringHeader, out HashSet<string> stringGoals))
+                    candidates.Add((stringGoals, $"string-array@0x{slotsOffset:X}", ScoreStoryGoalSet(stringGoals), slotsOffset, true));
+            }
+
+            if (candidates.Count == 0)
+            {
+                failureReason = "no valid Story Goal strings were found in completedGoals.";
+                return false;
+            }
+
+            var best = candidates
+                .OrderByDescending(candidate => candidate.Score)
+                .ThenByDescending(candidate => candidate.Goals.Count)
+                .First();
+
+            result = best.Goals;
+            storyGoalSlotsOffset = best.Offset;
+            storyGoalUsesStringArray = best.UsesStringArray;
+            if (!string.Equals(storyGoalReaderMode, best.Mode, StringComparison.Ordinal))
+            {
+                storyGoalReaderMode = best.Mode;
+                logger.Log($"Story goal reader selected {storyGoalReaderMode} ({result.Count} goals).");
+            }
+
+            return true;
+        }
+
+        private bool TryReadStoryGoalsFromSlotArray(IntPtr hashSetPtr, int slotsOffset, int stringHeader, out HashSet<string> result)
+        {
+            result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            IntPtr slotsArray = game.Read<IntPtr>(hashSetPtr + slotsOffset);
+            if (slotsArray == IntPtr.Zero)
+                return false;
+
+            int length = game.Read<int>(slotsArray + arr_off_len);
+            if (length <= 0 || length > 200000)
+                return false;
+
+            int slotStride = game.PointerSize == 8 ? 0x10 : 0x0C;
+            IntPtr firstSlot = slotsArray + arr_data_base;
+            for (int i = 0; i < length; i++)
+            {
+                IntPtr slot = firstSlot + i * slotStride;
+                if (game.Read<int>(slot) < 0)
+                    continue;
+
+                IntPtr valuePtr = game.Read<IntPtr>(slot + 0x08);
+                if (TryReadStoryGoalKey(valuePtr, stringHeader, out string goal))
+                    result.Add(goal);
+            }
+
+            return result.Count > 0;
+        }
+
+        private bool TryReadStoryGoalsFromStringArray(IntPtr hashSetPtr, int slotsOffset, int stringHeader, out HashSet<string> result)
+        {
+            result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            IntPtr stringArray = game.Read<IntPtr>(hashSetPtr + slotsOffset);
+            if (stringArray == IntPtr.Zero)
+                return false;
+
+            int length = game.Read<int>(stringArray + arr_off_len);
+            if (length <= 0 || length > 200000)
+                return false;
+
+            IntPtr firstString = stringArray + arr_data_base;
+            for (int i = 0; i < length; i++)
+            {
+                IntPtr valuePtr = game.Read<IntPtr>(firstString + i * game.PointerSize);
+                if (TryReadStoryGoalKey(valuePtr, stringHeader, out string goal))
+                    result.Add(goal);
+            }
+
+            return result.Count > 0;
         }
 
         private bool TryReadStoryGoalKey(IntPtr valuePtr, int stringHeader, out string goal)
@@ -2271,12 +1883,41 @@ namespace LiveSplit.BelowZero
             try
             {
                 goal = game.ReadString(valuePtr + stringHeader, EStringType.UTF16Sized);
-                return !string.IsNullOrWhiteSpace(goal);
+                return IsLikelyStoryGoalKey(goal);
             }
             catch
             {
                 return false;
             }
+        }
+
+        private static bool IsLikelyStoryGoalKey(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 128)
+                return false;
+
+            return value.All(character =>
+                char.IsLetterOrDigit(character)
+                || character == '_'
+                || character == '.'
+                || character == '-');
+        }
+
+        private static int ScoreStoryGoalSet(HashSet<string> goals)
+        {
+            int score = goals.Count;
+            foreach (string goal in goals)
+            {
+                if (TryParseStoryGoal(goal, out _))
+                    score += 100;
+                else if (goal.StartsWith("On", StringComparison.OrdinalIgnoreCase)
+                    || goal.StartsWith("Log_", StringComparison.OrdinalIgnoreCase)
+                    || goal.StartsWith("Call_", StringComparison.OrdinalIgnoreCase)
+                    || goal.StartsWith("Scan_", StringComparison.OrdinalIgnoreCase))
+                    score += 3;
+            }
+
+            return score;
         }
 
         private static bool TryParseStoryGoal(string value, out StoryGoal goal)

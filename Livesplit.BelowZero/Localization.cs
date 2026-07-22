@@ -1,18 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using System.Web.Script.Serialization;
 
 namespace LiveSplit.BelowZero
 {
     public static class Localization
     {
         private static IReadOnlyDictionary<string, string> _translations = new Dictionary<string, string>();
+        private static IReadOnlyDictionary<string, string> _translationsIgnoreCase =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private const string ResourcePath = "LiveSplit.BelowZero.Resources.English.json";
 
         private static string StripJsonComments(string s)
@@ -20,52 +20,6 @@ namespace LiveSplit.BelowZero
             s = Regex.Replace(s, @"^\s*//.*$", "", RegexOptions.Multiline);
             s = Regex.Replace(s, @"/\*.*?\*/", "", RegexOptions.Singleline);
             return s;
-        }
-
-        private static string EscapeInvalidStringChars(string s)
-        {
-            var sb = new StringBuilder(s.Length + 64);
-            bool inString = false;
-            bool escaped = false;
-
-            for (int i = 0; i < s.Length; i++)
-            {
-                char c = s[i];
-
-                if (inString)
-                {
-                    if (escaped)
-                    {
-                        sb.Append(c);
-                        escaped = false;
-                    }
-                    else
-                    {
-                        if (c == '\\') { sb.Append(c); escaped = true; }
-                        else if (c == '"') { sb.Append(c); inString = false; }
-                        else if (c == '\n') sb.Append("\\n");
-                        else if (c == '\r') sb.Append("\\r");
-                        else if (c == '\t') sb.Append("\\t");
-                        else if (c < 0x20) sb.Append("\\u" + ((int)c).ToString("X4"));
-                        else sb.Append(c);
-                    }
-                }
-                else
-                {
-                    if (c == '"') { sb.Append(c); inString = true; }
-                    else sb.Append(c);
-                }
-            }
-            return sb.ToString();
-        }
-
-        private static T DeserializeWithComments<T>(string json)
-        {
-            var reader = new Utf8JsonReader(
-                Encoding.UTF8.GetBytes(json),
-                new JsonReaderOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-
-            return JsonSerializer.Deserialize<T>(ref reader, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
 
         public static void Load()
@@ -78,9 +32,17 @@ namespace LiveSplit.BelowZero
                 {
                     string json = sr.ReadToEnd();
                     json = StripJsonComments(json);
-                    json = EscapeInvalidStringChars(json);
-                    var dict = DeserializeWithComments<Dictionary<string, string>>(json);
-                    _translations = (dict != null) ? dict : new Dictionary<string, string>();
+                    var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                    var dict = serializer.Deserialize<Dictionary<string, string>>(json);
+                    _translations = dict ?? new Dictionary<string, string>();
+
+                    var translationsIgnoreCase = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (KeyValuePair<string, string> entry in _translations)
+                    {
+                        if (!translationsIgnoreCase.ContainsKey(entry.Key))
+                            translationsIgnoreCase.Add(entry.Key, entry.Value);
+                    }
+                    _translationsIgnoreCase = translationsIgnoreCase;
                 }
             }
         }
@@ -95,41 +57,20 @@ namespace LiveSplit.BelowZero
             if (_translations.TryGetValue(keyString, out var value))
                 return value;
 
-            foreach (string prefixedKey in new[] { "Ency_" + keyString, "Log_" + keyString, "EncyPath_" + keyString })
-            {
-                if (_translations.TryGetValue(prefixedKey, out value))
-                    return value;
-            }
+            if (_translations.TryGetValue("Ency_" + keyString, out value)
+                || _translations.TryGetValue("Log_" + keyString, out value)
+                || _translations.TryGetValue("EncyPath_" + keyString, out value))
+                return value;
 
-            var match = _translations.FirstOrDefault(kv => string.Equals(kv.Key, keyString, StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrEmpty(match.Value))
-                return match.Value;
+            if (_translationsIgnoreCase.TryGetValue(keyString, out value))
+                return value;
 
-            foreach (string prefixedKey in new[] { "Ency_" + keyString, "Log_" + keyString, "EncyPath_" + keyString })
-            {
-                match = _translations.FirstOrDefault(kv => string.Equals(kv.Key, prefixedKey, StringComparison.OrdinalIgnoreCase));
-                if (!string.IsNullOrEmpty(match.Value))
-                    return match.Value;
-            }
+            if (_translationsIgnoreCase.TryGetValue("Ency_" + keyString, out value)
+                || _translationsIgnoreCase.TryGetValue("Log_" + keyString, out value)
+                || _translationsIgnoreCase.TryGetValue("EncyPath_" + keyString, out value))
+                return value;
 
             return Regex.Replace(keyString.Replace('_', ' '), "(?<=[a-z0-9])([A-Z])", " $1");
-        }
-
-        public static string GetRawName(object value)
-        {
-            if (_translations == null)
-                throw new InvalidOperationException("Translations not loaded.");
-
-            var valueString = value.ToString();
-
-            var key = _translations.FirstOrDefault(x => x.Value.Equals(value)).Key;
-
-            if (key != null)
-                return key;
-
-            var match = _translations.FirstOrDefault(kv => string.Equals(kv.Key, valueString, StringComparison.OrdinalIgnoreCase));
-
-            return match.Value ?? valueString;
         }
     }
 }

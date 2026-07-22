@@ -82,7 +82,5 @@ namespace Voxif.AutoSplitter {
         public virtual Action OnHook { get; set; }
         public virtual Action OnExit { get; set; }
 
-        public delegate void OnVersionDetectedCallback(string version);
-        public OnVersionDetectedCallback OnVersionDetected { get; set; }
     }
 }

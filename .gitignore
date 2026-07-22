@@ -21,3 +21,7 @@ tmp_compare_versions.py
 *.sln.docstates
 
 _*.log
+
+BuildAutosplitter.ps1
+ForcebuildAutosplitter.ps1
+LaunchLiveSplitWithBelowZeroLog.ps1

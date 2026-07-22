@@ -269,7 +269,6 @@ namespace LiveSplit.BelowZero
         MapRoomCamera = 5527,
         Poster = 6005,
         KharaaSampleSkeleton = 8001,
-        PrecursorNPCBody = 8012,
         SpyPenguin = 8030,
         SpyPenguinRemote = 8033,
         PosterAlterraBounty = 8036,

@@ -269,11 +269,6 @@ namespace LiveSplit.BelowZero
 
                 case SplitName.Craft:
                     var craftable = BelowZeroSplitSetting.GetTechType(value);
-                    if (craftable == TechType.PrecursorNPCBody)
-                    {
-                        split = new PrefabSplit(SplitName.CommenceStorageMediumFabricationSplit, onlySplitOnce, isSubCondition);
-                        break;
-                    }
                     split = new CraftSplit(craftable.ConvertTo<Craftable>(), onlySplitOnce, isSubCondition);
                     break;
 

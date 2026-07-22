@@ -151,7 +151,6 @@
     </Compile>
     <Compile Include="BelowZeroComponent.cs" />
     <Compile Include="BelowZeroMemory.cs" />
-    <Compile Include="BelowZeroVersionedData.cs" />
     <Compile Include="Settings\BelowZeroSettings.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -166,7 +165,6 @@
     <Compile Include="Voxif.AutoSplitter\Memory.cs" />
     <Compile Include="Voxif.AutoSplitter\NativeMethods.cs" />
     <Compile Include="Voxif.Helpers\HelperTask.cs" />
-    <Compile Include="Voxif.Helpers\ScanHelper.cs" />
     <Compile Include="Voxif.Helpers\Voxif.Helpers.MemoryHelper\MemoryHelper.cs" />
     <Compile Include="Voxif.Helpers\Voxif.Helpers.StructReflector\StructReflector.cs" />
     <Compile Include="Voxif.Helpers\Voxif.Helpers.Unity\MonoNestedPointer.cs" />
@@ -248,19 +246,8 @@
       <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\LiveSplit.Core.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.Buffers, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\System.Buffers.dll</HintPath>
-    </Reference>
     <Reference Include="System.Drawing" />
-    <Reference Include="System.Memory, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\System.Memory.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Text.Json, Version=10.0.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\System.Text.Json.dll</HintPath>
-    </Reference>
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="UpdateManager, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -276,9 +263,8 @@
     <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System.Resources.Extensions, Version=9.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Program Files\dotnet\sdk\9.0.314\System.Resources.Extensions.dll</HintPath>
+    <Reference Include="System.Resources.Extensions">
+      <HintPath>$(MSBuildToolsPath)\System.Resources.Extensions.dll</HintPath>
     </Reference>
   </ItemGroup>
   <Target Name="CopyComponentOutputs" AfterTargets="Build">
