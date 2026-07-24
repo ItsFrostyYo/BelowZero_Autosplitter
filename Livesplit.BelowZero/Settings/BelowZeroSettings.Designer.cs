@@ -135,7 +135,7 @@ namespace LiveSplit.BelowZero
             this.chkDiscordStatus.Size = new System.Drawing.Size(96, 17);
             this.chkDiscordStatus.TabIndex = 0;
             this.chkDiscordStatus.Text = "Discord Status";
-            this.ToolTips.SetToolTip(this.chkDiscordStatus, "Show Below Zero speedrun information as your Discord activity.");
+            this.ToolTips.SetToolTip(this.chkDiscordStatus, "Enables Discord Rich Presence to Display your Discord Game Status with the Autosplitter, this will display Main Menu| Loading| Running| Finished| Unknown with Time and Split Delta's.");
             this.chkDiscordStatus.UseVisualStyleBackColor = true;
             this.chkDiscordStatus.CheckedChanged += new System.EventHandler(this.chkDiscordStatus_CheckedChanged);
             // 

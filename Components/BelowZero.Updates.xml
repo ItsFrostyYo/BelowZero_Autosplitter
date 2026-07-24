@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <updates>
+    <update version="1.5.1.3">
+        <files>
+            <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>
+        </files>
+        <changelog>
+            <change>Update README for Discord Rich Presence</change>
+            <change>Update Discord Status/Rich Presence Tooltip</change>
+        </changelog>
+    </update>
     <update version="1.5.1.2">
         <files>
             <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>

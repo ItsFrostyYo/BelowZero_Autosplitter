@@ -32,6 +32,7 @@ Other versions may partially work as well. When an exact version is not matched,
 - `Reset` resets the timer when the main menu is shown
 
 ## Others
+- `Discord Status` Enables Discord Rich Presence to Display your Discord Game Status with the Autosplitter, this will display `Main Menu`| `Loading` | `Running`| `Finished`| `Unknown` with Time and Split Delta's.
 - `Warn On Reset If Gold Split` asks to save golds before an automatic reset
 - `Ordered Splits (LiveSplit)` matches auto-splits to the current LiveSplit split order
 - `Ordered Splits (Auto-Splits)` makes configured auto-splits trigger in their own sequence
