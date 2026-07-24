@@ -44,7 +44,6 @@ namespace LiveSplit.BelowZero
             Localization.Load();
             _state = state;
             settings = new BelowZeroSettings(state);
-            settings.InitializeDiscordStatusSetting();
             memory = new BelowZeroMemory(logger, settings);
             timerModel = new TimerModel() { CurrentState = state };
             richPresence = new BelowZeroRichPresence(

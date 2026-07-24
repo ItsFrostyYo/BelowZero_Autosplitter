@@ -34,6 +34,7 @@ namespace LiveSplit.BelowZero
             this.Options_GroupBox = new System.Windows.Forms.GroupBox();
             this.ButtonSplitGenerator = new System.Windows.Forms.Button();
             this.Other_GroupBox = new System.Windows.Forms.GroupBox();
+            this.chkDiscordStatus = new System.Windows.Forms.CheckBox();
             this.cbOrderedAutoSplits = new System.Windows.Forms.CheckBox();
             this.cbOrderedLiveSplit = new System.Windows.Forms.CheckBox();
             this.chkAskForGoldSave = new System.Windows.Forms.CheckBox();
@@ -111,6 +112,7 @@ namespace LiveSplit.BelowZero
             // 
             // Other_GroupBox
             // 
+            this.Other_GroupBox.Controls.Add(this.chkDiscordStatus);
             this.Other_GroupBox.Controls.Add(this.cbOrderedAutoSplits);
             this.Other_GroupBox.Controls.Add(this.cbOrderedLiveSplit);
             this.Other_GroupBox.Controls.Add(this.chkAskForGoldSave);
@@ -121,13 +123,29 @@ namespace LiveSplit.BelowZero
             this.Other_GroupBox.TabStop = false;
             this.Other_GroupBox.Text = "Others";
             // 
+            // chkDiscordStatus
+            // 
+            this.chkDiscordStatus.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.chkDiscordStatus.AutoSize = true;
+            this.chkDiscordStatus.Checked = true;
+            this.chkDiscordStatus.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkDiscordStatus.Location = new System.Drawing.Point(5, 19);
+            this.chkDiscordStatus.Margin = new System.Windows.Forms.Padding(2);
+            this.chkDiscordStatus.Name = "chkDiscordStatus";
+            this.chkDiscordStatus.Size = new System.Drawing.Size(96, 17);
+            this.chkDiscordStatus.TabIndex = 0;
+            this.chkDiscordStatus.Text = "Discord Status";
+            this.ToolTips.SetToolTip(this.chkDiscordStatus, "Show Below Zero speedrun information as your Discord activity.");
+            this.chkDiscordStatus.UseVisualStyleBackColor = true;
+            this.chkDiscordStatus.CheckedChanged += new System.EventHandler(this.chkDiscordStatus_CheckedChanged);
+            // 
             // cbOrderedAutoSplits
             // 
             this.cbOrderedAutoSplits.AutoSize = true;
-            this.cbOrderedAutoSplits.Location = new System.Drawing.Point(5, 61);
+            this.cbOrderedAutoSplits.Location = new System.Drawing.Point(5, 79);
             this.cbOrderedAutoSplits.Name = "cbOrderedAutoSplits";
             this.cbOrderedAutoSplits.Size = new System.Drawing.Size(151, 17);
-            this.cbOrderedAutoSplits.TabIndex = 2;
+            this.cbOrderedAutoSplits.TabIndex = 3;
             this.cbOrderedAutoSplits.Text = "Ordered Splits (Auto-Splits)";
             this.ToolTips.SetToolTip(this.cbOrderedAutoSplits, "Auto-splits trigger one after another in their own sequence.");
             this.cbOrderedAutoSplits.UseVisualStyleBackColor = true;
@@ -136,10 +154,10 @@ namespace LiveSplit.BelowZero
             // cbOrderedLiveSplit
             // 
             this.cbOrderedLiveSplit.AutoSize = true;
-            this.cbOrderedLiveSplit.Location = new System.Drawing.Point(5, 43);
+            this.cbOrderedLiveSplit.Location = new System.Drawing.Point(5, 59);
             this.cbOrderedLiveSplit.Name = "cbOrderedLiveSplit";
             this.cbOrderedLiveSplit.Size = new System.Drawing.Size(141, 17);
-            this.cbOrderedLiveSplit.TabIndex = 1;
+            this.cbOrderedLiveSplit.TabIndex = 2;
             this.cbOrderedLiveSplit.Text = "Ordered Splits (LiveSplit)";
             this.ToolTips.SetToolTip(this.cbOrderedLiveSplit, "Auto-splits are triggered in the same order as the splits in LiveSplit.\nIf you sk" +
         "ip a split in LiveSplit, the corresponding auto-split will also be skipped.");
@@ -150,11 +168,11 @@ namespace LiveSplit.BelowZero
             // 
             this.chkAskForGoldSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.chkAskForGoldSave.AutoSize = true;
-            this.chkAskForGoldSave.Location = new System.Drawing.Point(5, 25);
+            this.chkAskForGoldSave.Location = new System.Drawing.Point(5, 39);
             this.chkAskForGoldSave.Margin = new System.Windows.Forms.Padding(2);
             this.chkAskForGoldSave.Name = "chkAskForGoldSave";
             this.chkAskForGoldSave.Size = new System.Drawing.Size(157, 17);
-            this.chkAskForGoldSave.TabIndex = 0;
+            this.chkAskForGoldSave.TabIndex = 1;
             this.chkAskForGoldSave.Text = "Warn On Reset If Gold Split";
             this.ToolTips.SetToolTip(this.chkAskForGoldSave, "Ask to save golds when the timer auto resets");
             this.chkAskForGoldSave.UseVisualStyleBackColor = true;
@@ -317,6 +335,6 @@ namespace LiveSplit.BelowZero
         private System.Windows.Forms.Button ButtonSplitGenerator;
         private System.Windows.Forms.CheckBox cbOrderedLiveSplit;
         private System.Windows.Forms.CheckBox cbOrderedAutoSplits;
+        private System.Windows.Forms.CheckBox chkDiscordStatus;
     }
 }
-

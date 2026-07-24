@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <updates>
+    <update version="1.5.1.2">
+        <files>
+            <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>
+        </files>
+        <changelog>
+            <change>Discord Rich Presence Optimization</change>
+            <change>Transfered Temporary Rich Presence Setting to Main Settings Designer</change>
+        </changelog>
+    </update>
     <update version="1.5.0.7">
         <files>
             <file path="Components/LiveSplit.BelowZero.dll" status="changed"/>

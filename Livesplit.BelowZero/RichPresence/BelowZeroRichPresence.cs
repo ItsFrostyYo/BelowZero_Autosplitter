@@ -47,9 +47,15 @@ namespace LiveSplit.BelowZero.RichPresence
                 return;
             }
 
-            DateTime nowUtc = DateTime.UtcNow;
+           DateTime nowUtc = DateTime.UtcNow;
+
+            // Avoid calculating category text, leaderboard URLs, comparison
+            // deltas, and memory statuses between Discord refreshes.
+            if (nowUtc < nextAllowedUpdateUtc)
+              return;
+
             DateTime? processStartTimeUtc =
-                memory.ProcessStartTimeUtc;
+              memory.ProcessStartTimeUtc;
 
             bool localGameProcessFound =
                 processStartTimeUtc.HasValue;
@@ -67,13 +73,6 @@ namespace LiveSplit.BelowZero.RichPresence
                 localGameProcessFound
                     ? processStartTimeUtc
                     : null;
-
-            // Never send updates faster than the configured interval.
-            if (presenceVisible &&
-                nowUtc < nextAllowedUpdateUtc)
-            {
-                return;
-            }
 
             string payloadKey =
                 data.Details + "\n" +
@@ -147,11 +146,12 @@ namespace LiveSplit.BelowZero.RichPresence
                     "Discord Rich Presence update failed: " + ex);
 
                 DisposeClient();
+                ResetTracking();
 
                 nextAllowedUpdateUtc =
                     nowUtc.Add(
                         RichPresenceConfiguration.RefreshInterval);
-            }
+            }   
         }
 
         public void Stop()
