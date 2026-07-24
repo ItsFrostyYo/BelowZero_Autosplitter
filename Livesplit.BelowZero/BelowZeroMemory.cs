@@ -26,6 +26,23 @@ namespace LiveSplit.BelowZero
         public bool isInMainMenu;
         public bool wasInMainMenu;
         public bool pointersInitialized;
+        public DateTime? ProcessStartTimeUtc
+        {
+            get
+            {
+                try
+            {
+                if (game?.Process == null || game.Process.HasExited)
+                return null;
+
+                return game.Process.StartTime.ToUniversalTime();
+            }
+                catch
+            {
+                return null;
+            }
+            }
+        }
         private GameVersion gameVersion = GameVersion.Oct2025;
 
         private const int inventoryCapacitySlots = 48;
@@ -57,6 +74,37 @@ namespace LiveSplit.BelowZero
         private bool blueprintsInitialized;
         private bool encyclopediaInitialized;
         private bool storyGoalsInitialized;
+
+        private static readonly HashSet<string>
+            richPresenceIgnoredStoryGoals =
+                new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase)
+                {
+                    "IntroRespawnLocation",
+                    "Weather_IntroReboot"
+                };
+
+        // These two intro setup goals are emitted during the transition into
+        // the opening cinematic. They should not make Rich Presence think the
+        // player has progressed beyond the early loading state.
+        public int RichPresenceCompletedStoryGoalCount =>
+            storyGoalsInitialized
+                ? completedStoryGoals.Count(
+                    goal =>
+                        !richPresenceIgnoredStoryGoals.Contains(
+                            goal))
+                : 0;
+
+        // The game briefly enables/disables player input while transitioning
+        // from the initial load into the opening cinematic. These two setup
+        // goals identify that exact new-game window more reliably than input.
+        // Once IntroComplete exists, this is no longer an intro-loading state.
+        public bool IsIntroSetupTransitionActive =>
+            storyGoalsInitialized &&
+            !completedStoryGoals.Contains("IntroComplete") &&
+            (completedStoryGoals.Contains("IntroRespawnLocation") ||
+             completedStoryGoals.Contains("Weather_IntroReboot"));
+
         private string storyGoalReaderStatus = string.Empty;
         private string storyGoalReaderMode = string.Empty;
         private int storyGoalSlotsOffset;
@@ -64,6 +112,15 @@ namespace LiveSplit.BelowZero
         private int playerInventorySlotsUsed;
         private int playerInventorySlotsUsedOld;
         private int unityObjectCachedPtrOffset = 0x10;
+
+        private volatile bool waitingForItemGroupItemsField;
+
+        // During the first main menu, ItemGroup.items may not exist yet
+        // because the Player has never been created. Pointer initialization
+        // waits here until a save is loaded, which provides a useful signal
+        // for the otherwise-undetectable initial main menu.
+        public bool IsWaitingForItemGroupItemsField =>
+            waitingForItemGroupItemsField;
 
         public Pointer<bool> IsIntroCinematicActive;
         private Pointer<bool> AnimationPlaying;
@@ -177,6 +234,7 @@ namespace LiveSplit.BelowZero
                 storyGoalReaderMode = string.Empty;
                 storyGoalSlotsOffset = 0;
                 storyGoalUsesStringArray = false;
+                waitingForItemGroupItemsField = false;
                 DirectPositionX = null;
                 DirectPositionY = null;
                 DirectPositionZ = null;
@@ -457,7 +515,24 @@ namespace LiveSplit.BelowZero
             off_itemsDict = unity.ResolveFieldOffsetByNameOrPredicate(icKlass, new[] { "_items" }, name => UnityHelperTask.UnityNameUtil.NameHas(name, "items"));
 
             IntPtr itemGroupKlass = mono.FindClass("ItemGroup", mono.MainImage);
-            off_itemGroup_items = unity.ResolveFieldOffsetByNameOrPredicate(itemGroupKlass, new[] { "items" }, name => UnityHelperTask.UnityNameUtil.NameHas(name, "items"));
+
+            waitingForItemGroupItemsField = true;
+            try
+            {
+                off_itemGroup_items =
+                    unity.ResolveFieldOffsetByNameOrPredicate(
+                        itemGroupKlass,
+                        new[] { "items" },
+                        name =>
+                            UnityHelperTask.UnityNameUtil.NameHas(
+                                name,
+                                "items"));
+            }
+            finally
+            {
+                waitingForItemGroupItemsField = false;
+            }
+
             off_itemGroup_id = unity.ResolveFieldOffsetByNameOrPredicate(itemGroupKlass, new[] { "id", "techType" }, name =>
             {
                 string fieldName = name.ToLowerInvariant();

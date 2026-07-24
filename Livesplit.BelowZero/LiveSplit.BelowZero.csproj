@@ -10,6 +10,7 @@
     <RootNamespace>LiveSplit.BelowZero</RootNamespace>
     <AssemblyName>LiveSplit.BelowZero</AssemblyName>
     <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <RuntimeIdentifiers>win</RuntimeIdentifiers>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
@@ -156,6 +157,10 @@
     <Compile Include="Settings\BelowZeroSettings.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="RichPresence\BelowZeroRichPresence.cs" />
+    <Compile Include="RichPresence\BelowZeroRichPresenceSettings.cs" />
+    <Compile Include="RichPresence\RichPresenceConfiguration.cs" />
+    <Compile Include="RichPresence\RichPresenceFormatter.cs" />
     <Compile Include="Settings\BelowZeroSettings.Designer.cs">
       <DependentUpon>BelowZeroSettings.cs</DependentUpon>
     </Compile>
@@ -257,11 +262,24 @@
       <HintPath>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\UpdateManager.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="DiscordRichPresence"
+                      Version="1.6.1.70" />
+    <PackageReference Include="Fody"
+                      Version="6.9.3"
+                      PrivateAssets="all" />
+    <PackageReference Include="Costura.Fody"
+                      Version="6.2.0"
+                      PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="FodyWeavers.xml" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <ProjectComponentsDir>$(MSBuildProjectDirectory)\..\Components\</ProjectComponentsDir>
     <LiveSplitComponentsDir>C:\Users\mxz\Desktop\LiveSplit\LiveSplit_1.8.37\Components\</LiveSplitComponentsDir>
-    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
   </PropertyGroup>
   <ItemGroup>
@@ -273,7 +291,9 @@
     <MakeDir Directories="$(ProjectComponentsDir);$(LiveSplitComponentsDir)" />
     <ItemGroup>
       <ComponentOutputs Include="$(TargetPath)" />
-      <ComponentOutputs Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+      <ComponentOutputs
+          Include="$(TargetDir)$(TargetName).pdb"
+          Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
     </ItemGroup>
     <Copy SourceFiles="@(ComponentOutputs)" DestinationFolder="$(ProjectComponentsDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(ComponentOutputs)" DestinationFolder="$(LiveSplitComponentsDir)" SkipUnchangedFiles="true" />
@@ -282,4 +302,3 @@
     <Delete Files="$(ProjectComponentsDir)$(TargetName).pdb;$(LiveSplitComponentsDir)$(TargetName).pdb" />
   </Target>
 </Project>
-

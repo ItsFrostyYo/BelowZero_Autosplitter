@@ -8,8 +8,10 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using System.Xml;
 using Voxif.AutoSplitter;
 using Voxif.IO;
+using LiveSplit.BelowZero.RichPresence;
 
 namespace LiveSplit.BelowZero
 {
@@ -18,6 +20,7 @@ namespace LiveSplit.BelowZero
         private readonly BelowZeroMemory memory;
         private readonly LiveSplitState _state;
         private readonly TimerModel timerModel;
+        private readonly BelowZeroRichPresence richPresence;
         private string lastUpdateState = string.Empty;
         private string lastOrderedSplitDescription = string.Empty;
         private readonly HashSet<BelowZeroSplit> alreadySplit = new HashSet<BelowZeroSplit>();
@@ -41,8 +44,43 @@ namespace LiveSplit.BelowZero
             Localization.Load();
             _state = state;
             settings = new BelowZeroSettings(state);
+            settings.InitializeDiscordStatusSetting();
             memory = new BelowZeroMemory(logger, settings);
             timerModel = new TimerModel() { CurrentState = state };
+            richPresence = new BelowZeroRichPresence(
+                _state,
+                memory,
+                settings,
+                () => survivalStartArmed,
+                logger);
+        }
+
+        public override XmlNode GetSettings(XmlDocument document)
+        {
+            XmlNode root = base.GetSettings(document);
+
+            XmlElement discordStatus =
+                document.CreateElement("DiscordStatus");
+
+            discordStatus.InnerText =
+                settings.DiscordStatusEnabled.ToString();
+
+            root.AppendChild(discordStatus);
+            return root;
+        }
+
+        public override void SetSettings(XmlNode settingsNode)
+        {
+            base.SetSettings(settingsNode);
+
+            bool enabled = true;
+            XmlNode discordStatus =
+                settingsNode?.SelectSingleNode(".//DiscordStatus");
+
+            if (discordStatus != null)
+                bool.TryParse(discordStatus.InnerText, out enabled);
+
+            settings.SetDiscordStatusEnabled(enabled);
         }
 
         private void LogUpdateState(string state)
@@ -149,23 +187,31 @@ namespace LiveSplit.BelowZero
             }
             catch (Win32Exception ex)
             {
+                richPresence.Update();
                 logger.Log($"Win32Exception in memory.Update: {ex.Message}");
                 return false;
             }
             catch (Exception ex)
             {
+                richPresence.Update();
                 logger.Log($"Unexpected exception in memory.Update: {ex}");
                 return false;
             }
 
             if (!ok)
             {
+                // This allows Discord to show the lingering fallback while
+                // the game process exists but Below Zero's pointers are still
+                // initializing. If the process does not exist, Update()
+                // clears the Rich Presence normally.
+                richPresence.Update();
                 LogUpdateState("Waiting for Subnautica Below Zero process or pointer initialization.");
                 return false;
             }
 
             if (!memory.pointersInitialized)
             {
+                richPresence.Update();
                 LogUpdateState("Waiting for pointer initialization.");
                 return false;
             }
@@ -174,6 +220,7 @@ namespace LiveSplit.BelowZero
             if (memory.BiomeString.Changed)
                 logger.Log($"Biome changed: {memory.BiomeString.Old} -> {memory.BiomeString.New}");
 
+            richPresence.Update();
             TryResetOnMainMenu();
 
             return true;
@@ -321,6 +368,10 @@ namespace LiveSplit.BelowZero
             memory.ResetRunState();
             logger.Log("Run state cleared on timer reset.");
         }
+        public override void Dispose()
+        {
+            richPresence?.Dispose();
+            base.Dispose();
+        }
     }
 }
-
